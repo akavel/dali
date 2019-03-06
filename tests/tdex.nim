@@ -97,7 +97,7 @@ proc dumpHex(s: string): string =
       xl = if xr < 8: 3*xr else: 3*xr + 1
       n = ord(ch)
     result[y*line + xl] = HexChars[n shr 4]
-    result[y*line + xl + 1] = HexChars[n shr 4]
+    result[y*line + xl + 1] = HexChars[n and 0x0F]
     result[y*line + left + xr - 1] = if printable(ch): ch else: '.'
     if xr == 0:
       result[y*line + left + right - 1] = '\n'

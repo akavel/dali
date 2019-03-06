@@ -16,9 +16,9 @@ proc sample_dex*(tail: string): string =
   # SHA1 hash
   # TODO: should allow hashing a "stream", to not allocate new string...
   let sha1 = secureHash(header.substr(0x20) & tail)
-  header.write(0x10, parseHexStr($sha1))
+  header.write(0x0c, parseHexStr($sha1))
   # Adler checksum
-  header.write(0x08, adler32(header.substr(0x10) & tail))
+  header.write(0x08, adler32(header.substr(0x0c) & tail))
   return header & tail
 
 proc write(s: var string, pos: int, what: string) =
@@ -28,12 +28,12 @@ proc write(s: var string, pos: int, what: string) =
 
 proc write(s: var string, pos: int, what: uint32) =
   # Little-endian
-  let buf = [
-    chr(what and 0xff),
-    chr(what shr 8 and 0xff),
-    chr(what shr 16 and 0xff),
-    chr(what shr 24 and 0xff)]
-  s.write(pos, $buf)
+  var buf = newString(4)
+  buf[0] = chr(what and 0xff)
+  buf[1] = chr(what shr 8 and 0xff)
+  buf[2] = chr(what shr 16 and 0xff)
+  buf[3] = chr(what shr 24 and 0xff)
+  s.write(pos, buf)
 
 proc adler32(s: string): uint32 =
   var a: uint32 = 1
