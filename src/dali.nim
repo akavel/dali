@@ -40,9 +40,18 @@ proc addStr*(dex: Dex, s: string) =
   # "This list must be sorted by string contents, using UTF-16 code point
   # values (not in a locale-sensitive manner), and it must not contain any
   # duplicate entries." [dex-format] <- I think this is guaranteed by UTF-8 + CritBitTree type
-  # FIXME: MUTF-8: encode U+0000 as hex: C0 80
-  # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
-  # FIXME: start: length in UTF-16 code units, as ULEB128
+
+proc dumpStrings(dex: Dex): string =
+  var
+    buf = ""
+    pos = 0
+  for s in dex.strings:
+    # FIXME: MUTF-8: encode U+0000 as hex: C0 80
+    # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
+    # FIXME: length *in UTF-16 code units*, as ULEB128
+    pos += buf.write_uleb128(pos, s.len.uint32)
+    pos += buf.write(pos, s & "\x00")
+  return buf
 
 proc sample_dex*(tail: string): string =
   var header = newString(0x2C)
@@ -64,12 +73,13 @@ proc sample_dex*(tail: string): string =
   header.write(0x08, adler32(header.substr(0x0c) & tail))
   return header & tail
 
-proc write(s: var string, pos: int, what: string) =
+proc write(s: var string, pos: int, what: string): int {.discardable.} =
   if pos + what.len > s.len:
     setLen(s, pos + what.len)
   copyMem(addr(s[pos]), cstring(what), what.len)
+  return what.len
 
-proc write(s: var string, pos: int, what: uint32) =
+proc write(s: var string, pos: int, what: uint32): int {.discardable.} =
   # Little-endian
   var buf = newString(4)
   buf[0] = chr(what and 0xff)
@@ -77,6 +87,7 @@ proc write(s: var string, pos: int, what: uint32) =
   buf[2] = chr(what shr 16 and 0xff)
   buf[3] = chr(what shr 24 and 0xff)
   s.write(pos, buf)
+  return 4
 
 proc write_uleb128(s: var string, pos: int, what: uint32): int =
   ## Writes an uint32 in ULEB128 (https://source.android.com/devices/tech/dalvik/dex-format#leb128)

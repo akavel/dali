@@ -14,6 +14,23 @@ suite "internals":
     check uleb128(127).toHex == strip_space"7F"
     check uleb128(16256).toHex == strip_space"80 7F"
 
+  test "dumpStrings":
+    var dex = newDex()
+    dex.addStr"V"
+    dex.addStr"Landroid/app/Application;"
+    dex.addStr"""~~D8{"min-api":26,"version":"v0.1.14"}"""
+    dex.addStr"Lcom/bugsnag/dexexample/BugsnagApp;"
+    dex.addStr"<init>"
+    let want = strip_space"""
+                           063C696E 69743E00 194C616E
+64726F69 642F6170 702F4170 706C6963 6174696F 6E3B0023
+4C636F6D 2F627567 736E6167 2F646578 6578616D 706C652F
+42756773 6E616741 70703B00 01560026 7E7E4438 7B226D69
+6E2D6170 69223A32 362C2276 65727369 6F6E223A 2276302E
+312E3134 227D00
+""".dehexify
+    check dex.dumpStrings.dumpHex == want.dumpHex
+
 test "hello world.apk":
   # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
   let want = strip_space"""
@@ -112,4 +129,5 @@ proc dumpHex(s: string): string =
     result[y*line + left + xr - 1] = if printable(ch): ch else: '.'
     if xr == 0:
       result[y*line + left + right - 1] = '\n'
+  result = "\n " & result
 
