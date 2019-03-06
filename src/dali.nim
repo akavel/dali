@@ -35,7 +35,7 @@ proc sample_dex*(tail: string): string =
   # SHA1 hash
   # TODO: should allow hashing a "stream", to not allocate new string...
   let sha1 = secureHash(header.substr(0x20) & tail)
-  header.write(0x0c, parseHexStr($sha1))
+  header.write(0x0c, parseHexStr($sha1))  # FIXME(akavel): should not have to go through string!
   # Adler checksum
   header.write(0x08, adler32(header.substr(0x0c) & tail))
   return header & tail
