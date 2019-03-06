@@ -1,12 +1,14 @@
 {.experimental: "codeReordering".}
 import strutils
-import std/sha1
+import critbits
+import bitops
+import sha1
 
 # Potentially useful bibliography
 #
 # DEX:
 # - https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
-# - https://source.android.com/devices/tech/dalvik/dex-format
+# - [dex-format]: https://source.android.com/devices/tech/dalvik/dex-format
 # - https://blog.bugsnag.com/dex-and-d8/
 # - http://benlynn.blogspot.com/2009/02/minimal-dalvik-executables_06.html
 #
@@ -23,6 +25,25 @@ import std/sha1
 # - https://github.com/linkedin/dexmaker
 # - https://github.com/iBotPeaches/Apktool
 
+type
+  Dex* = ref object
+    strings: CritBitTree[int]
+  NotImplementedYetError* = object of CatchableError
+
+proc newDex*(): Dex =
+  new(result)
+
+proc addStr*(dex: Dex, s: string) =
+  if s.contains({'\x00', '\x80'..'\xFF'}):
+    raise newException(NotImplementedYetError, "strings with 0x00 or 0x80..0xFF bytes are not yet supported")
+  discard dex.strings.containsOrIncl(s, dex.strings.len)
+  # "This list must be sorted by string contents, using UTF-16 code point
+  # values (not in a locale-sensitive manner), and it must not contain any
+  # duplicate entries." [dex-format] <- I think this is guaranteed by UTF-8 + CritBitTree type
+  # FIXME: MUTF-8: encode U+0000 as hex: C0 80
+  # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
+  # FIXME: start: length in UTF-16 code units, as ULEB128
+
 proc sample_dex*(tail: string): string =
   var header = newString(0x2C)
   # Magic prefix
@@ -34,6 +55,7 @@ proc sample_dex*(tail: string): string =
   header.write(0x24, 0x70'u32)
   # Endian constant
   header.write(0x28, 0x12345678)
+
   # SHA1 hash
   # TODO: should allow hashing a "stream", to not allocate new string...
   let sha1 = secureHash(header.substr(0x20) & tail)
@@ -55,6 +77,27 @@ proc write(s: var string, pos: int, what: uint32) =
   buf[2] = chr(what shr 16 and 0xff)
   buf[3] = chr(what shr 24 and 0xff)
   s.write(pos, buf)
+
+proc write_uleb128(s: var string, pos: int, what: uint32): int =
+  ## Writes an uint32 in ULEB128 (https://source.android.com/devices/tech/dalvik/dex-format#leb128)
+  ## format, returning the number of bytes taken by the encoding.
+  if what == 0:
+    s.write(pos, "\x00")
+    return 1
+  let
+    topBit = fastLog2(what)  # position of the highest bit set
+    n = topBit/7 + 1         # number of bytes required for ULEB128 encoding of 'what'
+  var
+    buf = initSeq[string](n)
+    work = what
+    i = 0
+  while work > 0:
+    buf[i] = chr(0x80 or (work and 0x7F).byte)
+    work = work shr 7
+    inc i
+  return n
+
+
 
 proc adler32(s: string): uint32 =
   # https://en.wikipedia.org/wiki/Adler-32
