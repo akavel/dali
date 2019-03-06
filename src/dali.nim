@@ -2,6 +2,25 @@
 import strutils
 import std/sha1
 
+# Potentially useful bibliography
+#
+# DEX:
+# - https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
+# - https://blog.bugsnag.com/dex-and-d8/
+# - http://benlynn.blogspot.com/2009/02/minimal-dalvik-executables_06.html
+#
+# APK:
+# - https://fractalwrench.co.uk/posts/playing-apk-golf-how-low-can-an-android-app-go/
+# - https://github.com/fractalwrench/ApkGolf
+#
+# Opcodes:
+# - https://github.com/corkami/pics/blob/master/binary/opcodes_tables_compact.pdf
+#
+# MORE:
+# - https://github.com/JesusFreke/smali
+# - https://github.com/linkedin/dexmaker
+# - https://github.com/iBotPeaches/Apktool
+
 proc sample_dex*(tail: string): string =
   var header = newString(0x2C)
   # Magic prefix
@@ -36,6 +55,7 @@ proc write(s: var string, pos: int, what: uint32) =
   s.write(pos, buf)
 
 proc adler32(s: string): uint32 =
+  # https://en.wikipedia.org/wiki/Adler-32
   var a: uint32 = 1
   var b: uint32 = 0
   const MOD_ADLER = 65521
