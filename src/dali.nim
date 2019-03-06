@@ -6,6 +6,7 @@ import std/sha1
 #
 # DEX:
 # - https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
+# - https://source.android.com/devices/tech/dalvik/dex-format
 # - https://blog.bugsnag.com/dex-and-d8/
 # - http://benlynn.blogspot.com/2009/02/minimal-dalvik-executables_06.html
 #
@@ -15,6 +16,7 @@ import std/sha1
 #
 # Opcodes:
 # - https://github.com/corkami/pics/blob/master/binary/opcodes_tables_compact.pdf
+# - https://source.android.com/devices/tech/dalvik/dalvik-bytecode.html
 #
 # MORE:
 # - https://github.com/JesusFreke/smali
