@@ -1,7 +1,18 @@
 {.experimental: "codeReordering".}
 import unittest
 import strutils
-import dali
+include dali
+
+suite "internals":
+  test "write_uleb128":
+    proc uleb128(n: uint32): string =
+      var s = ""
+      discard s.write_uleb128(0, n)
+      return s
+    check uleb128(0).toHex == strip_space"00"
+    check uleb128(1).toHex == strip_space"01"
+    check uleb128(127).toHex == strip_space"7F"
+    check uleb128(16256).toHex == strip_space"80 7F"
 
 test "hello world.apk":
   # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf

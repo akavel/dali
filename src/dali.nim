@@ -2,7 +2,7 @@
 import strutils
 import critbits
 import bitops
-import sha1
+import std/sha1
 
 # Potentially useful bibliography
 #
@@ -86,15 +86,17 @@ proc write_uleb128(s: var string, pos: int, what: uint32): int =
     return 1
   let
     topBit = fastLog2(what)  # position of the highest bit set
-    n = topBit/7 + 1         # number of bytes required for ULEB128 encoding of 'what'
+    n = topBit div 7 + 1         # number of bytes required for ULEB128 encoding of 'what'
   var
-    buf = initSeq[string](n)
+    buf = newString(n.Natural)
     work = what
     i = 0
-  while work > 0:
-    buf[i] = chr(0x80 or (work and 0x7F).byte)
+  while work >= 0x80'u32:
+    buf[i] = chr(0x80.byte or (work and 0x7F).byte)
     work = work shr 7
     inc i
+  buf[i] = chr(work.byte)
+  s.write(pos, buf)
   return n
 
 
