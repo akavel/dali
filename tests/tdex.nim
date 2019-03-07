@@ -14,7 +14,7 @@ suite "internals":
     check uleb128(127).toHex == strip_space"7F"
     check uleb128(16256).toHex == strip_space"80 7F"
 
-  test "dumpStrings":
+  test "dumpStringsAndOffsets":
     var dex = newDex()
     dex.addStr"V"
     dex.addStr"Landroid/app/Application;"
@@ -29,7 +29,10 @@ suite "internals":
 6E2D6170 69223A32 362C2276 65727369 6F6E223A 2276302E
 312E3134 227D00
 """.dehexify
-    check dex.dumpStrings.dumpHex == want.dumpHex
+    let (have, offsets) = dex.dumpStringsAndOffsets(228)
+    check have.dumpHex == want.dumpHex
+    check offsets.dumpHex == strip_space"""
+E4000000 EC000000 07010000 2C010000 2F010000""".dehexify.dumpHex
 
 test "hello world.apk":
   # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf

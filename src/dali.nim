@@ -41,17 +41,21 @@ proc addStr*(dex: Dex, s: string) =
   # values (not in a locale-sensitive manner), and it must not contain any
   # duplicate entries." [dex-format] <- I think this is guaranteed by UTF-8 + CritBitTree type
 
-proc dumpStrings(dex: Dex): string =
+proc dumpStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
   var
     buf = ""
     pos = 0
+    offsets = newString(4 * dex.strings.len)
+    i = 0
   for s in dex.strings:
+    offsets.write(i * 4, uint32(baseOffset + pos))
+    inc i
     # FIXME: MUTF-8: encode U+0000 as hex: C0 80
     # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
     # FIXME: length *in UTF-16 code units*, as ULEB128
     pos += buf.write_uleb128(pos, s.len.uint32)
     pos += buf.write(pos, s & "\x00")
-  return buf
+  return (buf, offsets)
 
 proc sample_dex*(tail: string): string =
   var header = newString(0x2C)
