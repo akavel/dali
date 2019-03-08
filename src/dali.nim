@@ -3,6 +3,7 @@ import strutils
 import critbits
 import bitops
 import std/sha1
+import patty
 
 # Potentially useful bibliography
 #
@@ -30,10 +31,36 @@ type
     strings: CritBitTree[int]
   NotImplementedYetError* = object of CatchableError
 
+  Field* = tuple
+    class: Type
+    typ: Type
+    name: String
+  Type* = String
+  String* = string
+
+variant Arg:  # Argument of an instruction of Dalvik bytecode
+  RegXX(reg8: uint8)
+  FieldXXXX(field16: Field)
+
+type
+  Instr* = ref object
+    opcode: uint8
+    args: seq[Arg]
+
+
 proc newDex*(): Dex =
   new(result)
 
-proc addStr*(dex: Dex, s: string) =
+proc sget_object(reg: uint8, field: Field): Instr =
+  return newInstr(0x62, FieldXXXX(field))
+
+proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
+  new(result)
+  result.opcode = opcode
+  result.args = @args
+
+
+proc addStr(dex: Dex, s: string) =
   if s.contains({'\x00', '\x80'..'\xFF'}):
     raise newException(NotImplementedYetError, "strings with 0x00 or 0x80..0xFF bytes are not yet supported")
   discard dex.strings.containsOrIncl(s, dex.strings.len)
@@ -68,7 +95,7 @@ proc dumpStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
     pos += buf.write(pos, s & "\x00")
   return (buf, offsets)
 
-proc sample_dex*(tail: string): string =
+proc sample_dex(tail: string): string =
   var header = newString(0x2C)
   # Magic prefix
   # TODO: handle various versions of targetSdkVersion file, not only 035
