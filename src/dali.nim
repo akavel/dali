@@ -27,10 +27,7 @@ import std/sha1
 
 type
   Dex* = ref object
-    strings: CritBitTree[StringInfo]
-  StringInfo = tuple
-    i: int
-    sorted: int
+    strings: CritBitTree[int]
   NotImplementedYetError* = object of CatchableError
 
 proc newDex*(): Dex =
@@ -39,32 +36,36 @@ proc newDex*(): Dex =
 proc addStr*(dex: Dex, s: string) =
   if s.contains({'\x00', '\x80'..'\xFF'}):
     raise newException(NotImplementedYetError, "strings with 0x00 or 0x80..0xFF bytes are not yet supported")
-  discard dex.strings.containsOrIncl(s, (dex.strings.len, 0))
+  discard dex.strings.containsOrIncl(s, dex.strings.len)
   # "This list must be sorted by string contents, using UTF-16 code point
   # values (not in a locale-sensitive manner), and it must not contain any
   # duplicate entries." [dex-format] <- I think this is guaranteed by UTF-8 + CritBitTree type
 
-proc dumpStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
-  var
-    i = 0
-    asAdded = newSeq[string](dex.strings.len)
-  for s in dex.strings:
-    dex.strings[s].sorted = i
-    asAdded[dex.strings[s].i] = s
+proc stringsOrdering(dex: Dex): seq[int] =
+  var i = 0
+  newSeq(result, dex.strings.len)
+  for s, added in dex.strings:
+    result[added] = i
     inc i
 
+proc stringsAsAdded(dex: Dex): seq[string] =
+  newSeq(result, dex.strings.len)
+  for s, added in dex.strings:
+    result[added] = s
+
+proc dumpStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
   var
+    ordering = dex.stringsOrdering
     offsets = newString(4 * dex.strings.len)
     buf = ""
     pos = 0
-  for s in asAdded:
-    offsets.write(4 * dex.strings[s].sorted, uint32(baseOffset + pos))
+  for s in dex.stringsAsAdded:
+    offsets.write(4 * ordering[dex.strings[s]], uint32(baseOffset + pos))
     # FIXME: MUTF-8: encode U+0000 as hex: C0 80
     # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
     # FIXME: length *in UTF-16 code units*, as ULEB128
     pos += buf.write_uleb128(pos, s.len.uint32)
     pos += buf.write(pos, s & "\x00")
-
   return (buf, offsets)
 
 proc sample_dex*(tail: string): string =
