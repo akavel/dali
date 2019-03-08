@@ -37,10 +37,26 @@ type
     name: String
   Type* = String
   String* = string
+  Method* = tuple
+    class: Type
+    prototype: Prototype  # a.k.a. method signature
+    name: String
+  Prototype* = tuple
+    descriptor: String
+    ret: Type
+    params: TypeList
+  TypeList* = seq[Type]
+
+  uint4* = range[0..15]   # e.g. register v0..v15
 
 variant Arg:  # Argument of an instruction of Dalvik bytecode
+  RawX(raw4: uint4)
+  RawXX(raw8: uint8)
+  RegX(reg4: uint4)
   RegXX(reg8: uint8)
   FieldXXXX(field16: Field)
+  StringXXXX(string16: String)
+  MethodXXXX(method16: Method)
 
 type
   Instr* = ref object
@@ -52,7 +68,13 @@ proc newDex*(): Dex =
   new(result)
 
 proc sget_object(reg: uint8, field: Field): Instr =
-  return newInstr(0x62, FieldXXXX(field))
+  return newInstr(0x62, RegXX(reg), FieldXXXX(field))
+proc const_string(reg: uint8, s: String): Instr =
+  return newInstr(0x1a, RegXX(reg), StringXXXX(s))
+proc invoke_virtual(m: Method, regC: uint4, regD: uint4): Instr =
+  return newInstr(0x6e, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
+proc return_void(): Instr =
+  return newInstr(0x0e, RawXX(0))
 
 proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
   new(result)
