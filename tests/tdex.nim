@@ -14,13 +14,48 @@ suite "internals":
     check uleb128(127).toHex == strip_space"7F"
     check uleb128(16256).toHex == strip_space"80 7F"
 
+  test "dumpStringsAndOffsets unsorted":
+    var dex = newDex()
+    dex.addStr"Lhw;"
+    dex.addStr"Ljava/lang/Object;"
+    dex.addStr"V"
+    dex.addStr"[Ljava/lang/String;"
+    dex.addStr"VL"
+    dex.addStr"main"
+    dex.addStr"Ljava/lang/System;"
+    dex.addStr"Ljava/io/PrintStream;"
+    dex.addStr"out"
+    dex.addStr"Hello World!"
+    dex.addStr"Ljava/lang/String;"
+    dex.addStr"println"
+    let want = strip_space"""
+                               04 .L .h .w .; 00
+12 .L .j .a .v .a ./ .l  .a .n .g ./ .O .b .j .e
+.c .t .; 00 01 .V 00 13  .[ .L .j .a .v .a ./ .l
+.a .n .g ./ .S .t .r .i  .n .g .; 00 02 .V .L 00
+04 .m .a .i .n 00 12 .L  .j .a .v .a ./ .l .a .n
+.g ./ .S .y .s .t .e .m  .; 00 15 .L .j .a .v .a
+./ .i .o ./ .P .r .i .n  .t .S .t .r .e .a .m .;
+00 03 .o .u .t 00 0C .H  .e .l .l .o 20 .W .o .r
+.l .d .! 00 12 .L .j .a  .v .a ./ .l .a .n .g ./
+.S .t .r .i .n .g .; 00  07 .p .r .i .n .t .l .n
+00""".dehexify
+    let (have, offsets) = dex.dumpStringsAndOffsets(0x13A)
+    check have.dumpHex == want.dumpHex
+    let wantOffsets = strip_space"""
+A6 01 00 00 3A 01 00 00  8A 01 00 00 40 01 00 00
+B4 01 00 00 76 01 00 00  54 01 00 00 6C 01 00 00
+57 01 00 00 70 01 00 00  A1 01 00 00 C8 01 00 00
+""".dehexify
+    check offsets.dumpHex == wantOffsets.dumpHex
+
   test "dumpStringsAndOffsets":
     var dex = newDex()
-    dex.addStr"V"
-    dex.addStr"Landroid/app/Application;"
-    dex.addStr"""~~D8{"min-api":26,"version":"v0.1.14"}"""
-    dex.addStr"Lcom/bugsnag/dexexample/BugsnagApp;"
     dex.addStr"<init>"
+    dex.addStr"Landroid/app/Application;"
+    dex.addStr"Lcom/bugsnag/dexexample/BugsnagApp;"
+    dex.addStr"V"
+    dex.addStr"""~~D8{"min-api":26,"version":"v0.1.14"}"""
     let want = strip_space"""
                            063C696E 69743E00 194C616E
 64726F69 642F6170 702F4170 706C6963 6174696F 6E3B0023
