@@ -118,6 +118,7 @@ proc newDex*(): Dex =
   new(result)
 
 proc dump*(dex: Dex): string =
+  # Collect strings
   for cd in dex.classes:
     dex.addType(cd.class)
     if cd.superclass.kind == MaybeTypeKind.SomeType:
@@ -147,7 +148,7 @@ proc sget_object(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
 proc const_string(reg: uint8, s: String): Instr =
   return newInstr(0x1a, RegXX(reg), StringXXXX(s))
-proc invoke_virtual(m: Method, regC: uint4, regD: uint4): Instr =
+proc invoke_virtual(regC: uint4, regD: uint4, m: Method): Instr =
   return newInstr(0x6e, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
 proc return_void(): Instr =
   return newInstr(0x0e, RawXX(0))

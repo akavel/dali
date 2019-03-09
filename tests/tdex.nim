@@ -134,7 +134,11 @@ test "synthesized hello_world.apk":
             ins: 1,
             outs: 2,
             instrs: @[
-              sget_object(0, Field(class: "Ljava/lang/System;", typ: "Ljava/io/PrintStream;", name: "out"))
+              sget_object(0, Field(class: "Ljava/lang/System;", typ: "Ljava/io/PrintStream;", name: "out")),
+              const_string(1, "Hello World!"),
+              invoke_virtual(0, 1, Method(class: "Ljava/io/PrintStream;", name: "println",
+                prototype: Prototype(descriptor: "VL", ret: "V", params: @["Ljava/lang/String;"]))),
+              return_void(),
             ]))
         )
       ]
