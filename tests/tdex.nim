@@ -69,6 +69,33 @@ B4 01 00 00 76 01 00 00  54 01 00 00 6C 01 00 00
     check offsets.dumpHex == strip_space"""
 E4000000 EC000000 07010000 2C010000 2F010000""".dehexify.dumpHex
 
+test "synthesized hello_world.apk":
+  let dex = newDex()
+  dex.classes.add(ClassDef(
+    class: "Lhw;",
+    access: {Public},
+    superclass: SomeType("Ljava/lang/Object;"),
+    class_data: ClassData(
+      direct_methods: EncodedMethod(
+        m: Method(
+          class: "Lhw;",
+          prototype: Prototype(
+            descriptor: "VL",     # FIXME(akavel): what is this?
+            ret: "V",
+            params: @["Ljava/lang/String;"]),
+          name: "main"),
+        access: {Public, Static},
+        code: SomeCode(Code(
+          registers: 2,
+          ins: 1,
+          outs: 2,
+          instrs: @[
+            sget_object(0, Field(class: "Ljava/lang/System;", typ: "Ljava/io/PrintStream;", name: "out"))
+          ]))
+        )
+      )
+    ))
+
 test "hello world.apk":
   # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
   let want = strip_space"""

@@ -47,23 +47,23 @@ variantp MaybeCode:
 type
   Dex* = ref object
     strings: CritBitTree[int]
-    classes: seq[ClassDef]
+    classes*: seq[ClassDef]
   NotImplementedYetError* = object of CatchableError
 
-  Field* = tuple
-    class: Type
-    typ: Type
-    name: String
+  Field* = ref object
+    class*: Type
+    typ*: Type
+    name*: String
   Type* = String
   String* = string
-  Method* = tuple
-    class: Type
-    prototype: Prototype  # a.k.a. method signature
-    name: String
-  Prototype* = tuple
-    descriptor: String
-    ret: Type
-    params: TypeList
+  Method* = ref object
+    class*: Type
+    prototype*: Prototype  # a.k.a. method signature
+    name*: String
+  Prototype* = ref object
+    descriptor*: String
+    ret*: Type
+    params*: TypeList
   TypeList* = seq[Type]
 
   uint4* = range[0..15]   # e.g. register v0..v15
@@ -72,33 +72,33 @@ type
   Instr* = ref object
     opcode: uint8
     args: seq[Arg]
-  Code* = tuple
-    registers: uint16
-    ins: uint16
-    outs: uint16
+  Code* = ref object
+    registers*: uint16
+    ins*: uint16
+    outs*: uint16
     # tries: ?
     # debug_info: ?
-    instrs: seq[Instr]
+    instrs*: seq[Instr]
 
 type
-  ClassDef* = tuple
-    class: Type
-    access: set[Access]
-    superclass: MaybeType
-    interfaces: TypeList
+  ClassDef* = ref object
+    class*: Type
+    access*: set[Access]
+    superclass*: MaybeType
+    # interfaces: TypeList
     # sourcefile: String
     # annotations: ?
-    class_data: ClassData
+    class_data*: ClassData
     # static_values: ?
-  ClassData* = tuple
-    # static_fields: ?
-    # instance_fields: ?
-    direct_methods: EncodedMethod
-    # virtual_methods: ?
-  EncodedMethod* = tuple
-    m: Method
-    access: Access
-    code: MaybeCode
+  ClassData* = ref object
+    # static_fields*: ?
+    # instance_fields*: ?
+    direct_methods*: EncodedMethod
+    # virtual_methods*: ?
+  EncodedMethod* = ref object
+    m*: Method
+    access*: set[Access]
+    code*: MaybeCode
   Access* = enum
     Public = 0x1
     Private = 0x2
@@ -126,9 +126,7 @@ proc return_void(): Instr =
   return newInstr(0x0e, RawXX(0))
 
 proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
-  new(result)
-  result.opcode = opcode
-  result.args = @args
+  return Instr(opcode: opcode, args: @args)
 
 
 proc addStr(dex: Dex, s: string) =
