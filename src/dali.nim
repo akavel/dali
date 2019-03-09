@@ -46,7 +46,8 @@ variantp MaybeCode:
 
 type
   Dex* = ref object
-    strings: CritBitTree[int]
+    strings: CritBitTree[int]  # value: order of addition
+    types: CritBitTree[int]    # value: order of addition
     classes*: seq[ClassDef]
   NotImplementedYetError* = object of CatchableError
 
@@ -93,7 +94,7 @@ type
   ClassData* = ref object
     # static_fields*: ?
     # instance_fields*: ?
-    direct_methods*: EncodedMethod
+    direct_methods*: seq[EncodedMethod]
     # virtual_methods*: ?
   EncodedMethod* = ref object
     m*: Method
@@ -116,6 +117,32 @@ type
 proc newDex*(): Dex =
   new(result)
 
+proc dump*(dex: Dex): string =
+  for cd in dex.classes:
+    dex.addType(cd.class)
+    if cd.superclass.kind == MaybeTypeKind.SomeType:
+      dex.addType(cd.superclass.typ)
+    for dm in cd.class_data.direct_methods:
+      dex.addMethod(dm.m)
+      if dm.code.kind == MaybeCodeKind.SomeCode:
+        for instr in dm.code.code.instrs:
+          for arg in instr.args:
+            match arg:
+              RawX(r): discard
+              RawXX(r): discard
+              RegX(r): discard
+              RegXX(r): discard
+              FieldXXXX(f):
+                dex.addType(f.class)
+                dex.addType(f.typ)
+                dex.addStr(f.name)
+              StringXXXX(s):
+                dex.addStr(s)
+              MethodXXXX(m):
+                dex.addMethod(m)
+  let (s, off) = dex.dumpStringsAndOffsets(228)
+  return ' '.repeat(10) & s
+
 proc sget_object(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
 proc const_string(reg: uint8, s: String): Instr =
@@ -128,6 +155,18 @@ proc return_void(): Instr =
 proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
   return Instr(opcode: opcode, args: @args)
 
+
+proc addMethod(dex: Dex, m: Method) =
+  dex.addType(m.class)
+  dex.addType(m.prototype.ret)
+  for p in m.prototype.params:
+    dex.addType(p)
+  dex.addStr(m.prototype.descriptor)
+  dex.addStr(m.name)
+
+proc addType(dex: Dex, t: Type) =
+  dex.addStr(t)
+  discard dex.types.containsOrIncl(t, dex.types.len)
 
 proc addStr(dex: Dex, s: string) =
   if s.contains({'\x00', '\x80'..'\xFF'}):

@@ -69,36 +69,7 @@ B4 01 00 00 76 01 00 00  54 01 00 00 6C 01 00 00
     check offsets.dumpHex == strip_space"""
 E4000000 EC000000 07010000 2C010000 2F010000""".dehexify.dumpHex
 
-test "synthesized hello_world.apk":
-  let dex = newDex()
-  dex.classes.add(ClassDef(
-    class: "Lhw;",
-    access: {Public},
-    superclass: SomeType("Ljava/lang/Object;"),
-    class_data: ClassData(
-      direct_methods: EncodedMethod(
-        m: Method(
-          class: "Lhw;",
-          prototype: Prototype(
-            descriptor: "VL",     # FIXME(akavel): what is this?
-            ret: "V",
-            params: @["Ljava/lang/String;"]),
-          name: "main"),
-        access: {Public, Static},
-        code: SomeCode(Code(
-          registers: 2,
-          ins: 1,
-          outs: 2,
-          instrs: @[
-            sget_object(0, Field(class: "Ljava/lang/System;", typ: "Ljava/io/PrintStream;", name: "out"))
-          ]))
-        )
-      )
-    ))
-
-test "hello world.apk":
-  # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
-  let want = strip_space"""
+let hello_world_apk = strip_space"""
 .d .e .x 0A .0 .3 .5 00  6F 53 89 BC 1E 79 B2 4F
 1F 9C 09 66 15 23 2D 3B  56 65 32 C3 B5 81 B4 5A
 70 02 00 00 70 00 00 00  78 56 34 12 00 00 00 00
@@ -139,6 +110,41 @@ EC 00 00 00 01 20 00 00  01 00 00 00 0C 01 00 00
 0C 00 00 00 3A 01 00 00  00 20 00 00 01 00 00 00
 D1 01 00 00 00 10 00 00  01 00 00 00 DC 01 00 00
 """.dehexify
+
+
+test "synthesized hello_world.apk":
+  let dex = newDex()
+  dex.classes.add(ClassDef(
+    class: "Lhw;",
+    access: {Public},
+    superclass: SomeType("Ljava/lang/Object;"),
+    class_data: ClassData(
+      direct_methods: @[
+        EncodedMethod(
+          m: Method(
+            class: "Lhw;",
+            prototype: Prototype(
+              descriptor: "VL",     # FIXME(akavel): what is this?
+              ret: "V",
+              params: @["[Ljava/lang/String;"]),
+            name: "main"),
+          access: {Public, Static},
+          code: SomeCode(Code(
+            registers: 2,
+            ins: 1,
+            outs: 2,
+            instrs: @[
+              sget_object(0, Field(class: "Ljava/lang/System;", typ: "Ljava/io/PrintStream;", name: "out"))
+            ]))
+        )
+      ]
+    )
+  ))
+  check dex.dump.dumpHex == hello_world_apk.dumpHex
+
+test "hello world.apk":
+  # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
+  let want = hello_world_apk
   let tail = want.substr(0x2C)
   let have = sample_dex(tail)
   # check have.hexify == want.hexify
