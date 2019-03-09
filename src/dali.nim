@@ -26,9 +26,28 @@ import patty
 # - https://github.com/linkedin/dexmaker
 # - https://github.com/iBotPeaches/Apktool
 
+variant Arg:  # Argument of an instruction of Dalvik bytecode
+  RawX(raw4: uint4)
+  RawXX(raw8: uint8)
+  RegX(reg4: uint4)
+  RegXX(reg8: uint8)
+  FieldXXXX(field16: Field)
+  StringXXXX(string16: String)
+  MethodXXXX(method16: Method)
+
+variantp MaybeType:
+  SomeType(typ: Type)
+  NoType
+
+variantp MaybeCode:
+  SomeCode(code: Code)
+  NoCode
+
+
 type
   Dex* = ref object
     strings: CritBitTree[int]
+    classes: seq[ClassDef]
   NotImplementedYetError* = object of CatchableError
 
   Field* = tuple
@@ -49,19 +68,6 @@ type
 
   uint4* = range[0..15]   # e.g. register v0..v15
 
-variantp MaybeType:
-  SomeType(typ: Type)
-  NoType
-
-variant Arg:  # Argument of an instruction of Dalvik bytecode
-  RawX(raw4: uint4)
-  RawXX(raw8: uint8)
-  RegX(reg4: uint4)
-  RegXX(reg8: uint8)
-  FieldXXXX(field16: Field)
-  StringXXXX(string16: String)
-  MethodXXXX(method16: Method)
-
 type
   Instr* = ref object
     opcode: uint8
@@ -73,10 +79,6 @@ type
     # tries: ?
     # debug_info: ?
     instrs: seq[Instr]
-
-variantp MaybeCode:
-  SomeCode(code: Code)
-  NoCode
 
 type
   ClassDef* = tuple
