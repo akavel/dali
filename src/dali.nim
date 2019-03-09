@@ -49,6 +49,10 @@ type
 
   uint4* = range[0..15]   # e.g. register v0..v15
 
+variantp MaybeType:
+  SomeType(typ: Type)
+  NoType
+
 variant Arg:  # Argument of an instruction of Dalvik bytecode
   RawX(raw4: uint4)
   RawXX(raw8: uint8)
@@ -62,7 +66,50 @@ type
   Instr* = ref object
     opcode: uint8
     args: seq[Arg]
+  Code* = tuple
+    registers: uint16
+    ins: uint16
+    outs: uint16
+    # tries: ?
+    # debug_info: ?
+    instrs: seq[Instr]
 
+variantp MaybeCode:
+  SomeCode(code: Code)
+  NoCode
+
+type
+  ClassDef* = tuple
+    class: Type
+    access: set[Access]
+    superclass: MaybeType
+    interfaces: TypeList
+    # sourcefile: String
+    # annotations: ?
+    class_data: ClassData
+    # static_values: ?
+  ClassData* = tuple
+    # static_fields: ?
+    # instance_fields: ?
+    direct_methods: EncodedMethod
+    # virtual_methods: ?
+  EncodedMethod* = tuple
+    m: Method
+    access: Access
+    code: MaybeCode
+  Access* = enum
+    Public = 0x1
+    Private = 0x2
+    Protected = 0x4
+    Static = 0x8
+    Final = 0x10
+    Synchronized = 0x20
+    Varargs = 0x80
+    Interface = 0x200
+    Abstract = 0x400
+    Annotation = 0x2000
+    Enum = 0x4000
+    Constructor = 0x1_0000
 
 proc newDex*(): Dex =
   new(result)
