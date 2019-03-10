@@ -48,6 +48,9 @@ type
   Dex* = ref object
     strings: CritBitTree[int]  # value: order of addition
     types: CritBitTree[int]    # value: order of addition
+    # NOTE: prototypes must have no duplicates, and be sorted by:
+    # (ret's type ID; args' type ID)
+    # prototypes: HashSet[
     classes*: seq[ClassDef]
   NotImplementedYetError* = object of CatchableError
 
@@ -118,7 +121,8 @@ proc newDex*(): Dex =
   new(result)
 
 proc dump*(dex: Dex): string =
-  # Collect strings
+  # Collect strings and all the things
+  # (types, prototypes/signatures, fields, methods)
   for cd in dex.classes:
     dex.addType(cd.class)
     if cd.superclass.kind == MaybeTypeKind.SomeType:
