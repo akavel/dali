@@ -3,6 +3,7 @@ import strutils
 import critbits
 import bitops
 import std/sha1
+import sets
 import patty
 
 # Potentially useful bibliography
@@ -46,13 +47,16 @@ variantp MaybeCode:
 
 type
   Dex* = ref object
+    # Note: below fields are generally ordered from simplest to more complex
+    # (in order of dependency)
     strings: CritBitTree[int]  # value: order of addition
     types: CritBitTree[int]    # value: order of addition
-    # NOTE: prototypes must have no duplicates, and be sorted by:
+    # NOTE: prototypes must have no duplicates, TODO: and be sorted by:
     # (ret's type ID; args' type ID)
-    # prototypes: HashSet[
+    prototypes: HashSet[tuple[ret: string, params: seq[string]]]
     classes*: seq[ClassDef]
   NotImplementedYetError* = object of CatchableError
+  ConsistencyError* = object of CatchableError
 
   Field* = ref object
     class*: Type
@@ -119,6 +123,7 @@ type
 
 proc newDex*(): Dex =
   new(result)
+  init(result.prototypes)
 
 proc dump*(dex: Dex): string =
   # Collect strings and all the things
@@ -163,11 +168,28 @@ proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
 
 proc addMethod(dex: Dex, m: Method) =
   dex.addType(m.class)
-  dex.addType(m.prototype.ret)
-  for p in m.prototype.params:
-    dex.addType(p)
-  dex.addStr(m.prototype.descriptor)
+  dex.addPrototype(m.prototype)
   dex.addStr(m.name)
+
+proc addPrototype(dex: Dex, proto: Prototype) =
+  dex.addType(proto.ret)
+  var params = newSeq[string]()
+  for p in proto.params:
+    params.add(p)
+    dex.addType(p)
+  dex.prototypes.incl((proto.ret, params))
+  dex.addStr(proto.descriptor)
+
+proc descriptor(proto: Prototype): string =
+  proc typeChar(t: Type): string =
+    case t
+    of "V", "Z", "B", "S", "C", "I", "J", "F", "D": return t
+    else:
+      if t.startsWith"[" or t.startsWith"L": return "L"
+      else: raise newException(ConsistencyError, "unexpected type in prototype: " & t)
+  result = typeChar(proto.ret)
+  for p in proto.params:
+    result &= typeChar(p)
 
 proc addType(dex: Dex, t: Type) =
   dex.addStr(t)
