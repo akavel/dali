@@ -124,7 +124,6 @@ test "synthesized hello_world.apk":
           m: Method(
             class: "Lhw;",
             prototype: Prototype(
-              descriptor: "VL",     # FIXME(akavel): what is this?
               ret: "V",
               params: @["[Ljava/lang/String;"]),
             name: "main"),
@@ -137,7 +136,7 @@ test "synthesized hello_world.apk":
               sget_object(0, Field(class: "Ljava/lang/System;", typ: "Ljava/io/PrintStream;", name: "out")),
               const_string(1, "Hello World!"),
               invoke_virtual(0, 1, Method(class: "Ljava/io/PrintStream;", name: "println",
-                prototype: Prototype(descriptor: "VL", ret: "V", params: @["Ljava/lang/String;"]))),
+                prototype: Prototype(ret: "V", params: @["Ljava/lang/String;"]))),
               return_void(),
             ]))
         )

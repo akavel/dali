@@ -4,6 +4,7 @@ import critbits
 import bitops
 import std/sha1
 import sets
+import hashes
 import patty
 
 # Potentially useful bibliography
@@ -53,7 +54,13 @@ type
     types: CritBitTree[int]    # value: order of addition
     # NOTE: prototypes must have no duplicates, TODO: and be sorted by:
     # (ret's type ID; args' type ID)
-    prototypes: HashSet[tuple[ret: string, params: seq[string]]]
+    prototypes: HashSet[Prototype]
+    # NOTE: fields must have no duplicates, TODO: and be sorted by:
+    # (class type ID, field name's string ID, field's type ID)
+    fields: HashSet[tuple[class: Type, name: string, typ: Type]]
+    # NOTE: methods must have no duplicates, TODO: and be sorted by:
+    # (class type ID, name's string ID, prototype's proto ID)
+    methods: HashSet[tuple[class: Type, name: string, proto: Prototype]]
     classes*: seq[ClassDef]
   NotImplementedYetError* = object of CatchableError
   ConsistencyError* = object of CatchableError
@@ -69,7 +76,6 @@ type
     prototype*: Prototype  # a.k.a. method signature
     name*: String
   Prototype* = ref object
-    descriptor*: String
     ret*: Type
     params*: TypeList
   TypeList* = seq[Type]
@@ -121,9 +127,17 @@ type
     Enum = 0x4000
     Constructor = 0x1_0000
 
+proc hash*(proto: Prototype): Hash =
+  var h: Hash = 0
+  h = h !& hash(proto.ret)
+  h = h !& hash(proto.params)
+  result = !$h
+
 proc newDex*(): Dex =
   new(result)
   init(result.prototypes)
+  init(result.fields)
+  init(result.methods)
 
 proc dump*(dex: Dex): string =
   # Collect strings and all the things
@@ -143,9 +157,7 @@ proc dump*(dex: Dex): string =
               RegX(r): discard
               RegXX(r): discard
               FieldXXXX(f):
-                dex.addType(f.class)
-                dex.addType(f.typ)
-                dex.addStr(f.name)
+                dex.addField(f)
               StringXXXX(s):
                 dex.addStr(s)
               MethodXXXX(m):
@@ -165,11 +177,17 @@ proc return_void(): Instr =
 proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
   return Instr(opcode: opcode, args: @args)
 
+proc addField(dex: Dex, f: Field) =
+  dex.addType(f.class)
+  dex.addType(f.typ)
+  dex.addStr(f.name)
+  dex.fields.incl((f.class, f.name, f.typ))
 
 proc addMethod(dex: Dex, m: Method) =
   dex.addType(m.class)
   dex.addPrototype(m.prototype)
   dex.addStr(m.name)
+  dex.methods.incl((m.class, m.name, m.prototype))
 
 proc addPrototype(dex: Dex, proto: Prototype) =
   dex.addType(proto.ret)
@@ -177,7 +195,7 @@ proc addPrototype(dex: Dex, proto: Prototype) =
   for p in proto.params:
     params.add(p)
     dex.addType(p)
-  dex.prototypes.incl((proto.ret, params))
+  dex.prototypes.incl(proto)
   dex.addStr(proto.descriptor)
 
 proc descriptor(proto: Prototype): string =
