@@ -144,6 +144,7 @@ test "synthesized hello_world.apk":
     )
   ))
   check dex.dump.dumpHex == hello_world_apk.dumpHex
+  check dex.dumpTypeIDs.dumpHex == "x"
 
 test "hello world.apk":
   # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf

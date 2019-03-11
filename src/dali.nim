@@ -248,6 +248,14 @@ proc dumpStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
     pos += buf.write(pos, s & "\x00")
   return (buf, offsets)
 
+proc dumpTypeIds(dex: Dex): string =
+  let stringIds = dex.stringsOrdering
+  # dex.types are already stored sorted, same as dex.strings, so we don't need
+  # to sort again by type IDs
+  var i = 0
+  for t in dex.types:
+    i += result.write(i, stringIds[dex.strings[t]].uint32)
+
 proc sample_dex(tail: string): string =
   var header = newString(0x2C)
   # Magic prefix
