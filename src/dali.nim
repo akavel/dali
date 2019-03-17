@@ -140,7 +140,7 @@ proc newDex*(): Dex =
   init(result.fields)
   init(result.methods)
 
-proc dump*(dex: Dex): string =
+proc render*(dex: Dex): string =
   # Collect strings and all the things
   # (types, prototypes/signatures, fields, methods)
   for cd in dex.classes:
@@ -163,7 +163,7 @@ proc dump*(dex: Dex): string =
                 dex.addStr(s)
               MethodXXXX(m):
                 dex.addMethod(m)
-  let (s, off) = dex.dumpStringsAndOffsets(228)
+  let (s, off) = dex.renderStringsAndOffsets(228)
   return ' '.repeat(10) & s
 
 proc sget_object(reg: uint8, field: Field): Instr =
@@ -237,7 +237,7 @@ proc stringsAsAdded(dex: Dex): seq[string] =
   for s, added in dex.strings:
     result[added] = s
 
-proc dumpStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
+proc renderStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
   var
     ordering = dex.stringsOrdering
     offsets = newString(4 * dex.strings.len)
@@ -252,7 +252,7 @@ proc dumpStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
     pos += buf.write(pos, s & "\x00")
   return (buf, offsets)
 
-proc dumpTypeIds(dex: Dex): string =
+proc renderTypeIds(dex: Dex): string =
   let stringIds = dex.stringsOrdering
   # dex.types are already stored sorted, same as dex.strings, so we don't need
   # to sort again by type IDs

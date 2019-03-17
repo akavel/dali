@@ -14,7 +14,7 @@ suite "internals":
     check uleb128(127).toHex == strip_space"7F"
     check uleb128(16256).toHex == strip_space"80 7F"
 
-  test "dumpStringsAndOffsets unsorted":
+  test "renderStringsAndOffsets unsorted":
     var dex = newDex()
     dex.addStr"Lhw;"
     dex.addStr"Ljava/lang/Object;"
@@ -40,7 +40,7 @@ suite "internals":
 .l .d .! 00 12 .L .j .a  .v .a ./ .l .a .n .g ./
 .S .t .r .i .n .g .; 00  07 .p .r .i .n .t .l .n
 00""".dehexify
-    let (have, offsets) = dex.dumpStringsAndOffsets(0x13A)
+    let (have, offsets) = dex.renderStringsAndOffsets(0x13A)
     check have.dumpHex == want.dumpHex
     let wantOffsets = strip_space"""
 A6 01 00 00 3A 01 00 00  8A 01 00 00 40 01 00 00
@@ -49,7 +49,7 @@ B4 01 00 00 76 01 00 00  54 01 00 00 6C 01 00 00
 """.dehexify
     check offsets.dumpHex == wantOffsets.dumpHex
 
-  test "dumpStringsAndOffsets":
+  test "renderStringsAndOffsets":
     var dex = newDex()
     dex.addStr"<init>"
     dex.addStr"Landroid/app/Application;"
@@ -64,7 +64,7 @@ B4 01 00 00 76 01 00 00  54 01 00 00 6C 01 00 00
 6E2D6170 69223A32 362C2276 65727369 6F6E223A 2276302E
 312E3134 227D00
 """.dehexify
-    let (have, offsets) = dex.dumpStringsAndOffsets(228)
+    let (have, offsets) = dex.renderStringsAndOffsets(228)
     check have.dumpHex == want.dumpHex
     check offsets.dumpHex == strip_space"""
 E4000000 EC000000 07010000 2C010000 2F010000""".dehexify.dumpHex
@@ -143,8 +143,8 @@ test "synthesized hello_world.apk":
       ]
     )
   ))
-  check dex.dump.dumpHex == hello_world_apk.dumpHex
-  check dex.dumpTypeIDs.dumpHex == "x"
+  check dex.render.dumpHex == hello_world_apk.dumpHex
+  check dex.renderTypeIDs.dumpHex == "x"
 
 test "hello world.apk":
   # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
