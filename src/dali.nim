@@ -52,6 +52,7 @@ type
     # (in order of dependency)
     strings: CritBitTree[int]  # value: order of addition
     types: CritBitTree[int]    # value: order of addition
+    typeLists: seq[seq[Type]]
     # NOTE: prototypes must have no duplicates, TODO: and be sorted by:
     # (ret's type ID; args' type ID)
     prototypes: HashSet[Prototype]
@@ -191,10 +192,7 @@ proc addMethod(dex: Dex, m: Method) =
 
 proc addPrototype(dex: Dex, proto: Prototype) =
   dex.addType(proto.ret)
-  var params = newSeq[string]()
-  for p in proto.params:
-    params.add(p)
-    dex.addType(p)
+  dex.addTypeList(proto.params)
   dex.prototypes.incl(proto)
   dex.addStr(proto.descriptor)
 
@@ -208,6 +206,12 @@ proc descriptor(proto: Prototype): string =
   result = typeChar(proto.ret)
   for p in proto.params:
     result &= typeChar(p)
+
+proc addTypeList(dex: Dex, ts: seq[Type]) =
+  for p in ts:
+    dex.addType(p)
+  if not dex.typeLists.contains(ts):
+    dex.typeLists.add(ts)
 
 proc addType(dex: Dex, t: Type) =
   dex.addStr(t)
