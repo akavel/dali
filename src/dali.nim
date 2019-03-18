@@ -6,6 +6,17 @@ import std/sha1
 import sets
 import hashes
 import patty
+import sortedset
+
+# NOTE(akavel): this must be early, to make sure it's used, as codeReordering fails to move it
+proc `<`(p1, p2: Prototype): bool =
+  # echo "called <"
+  if p1.ret != p2.ret:
+    return p1.ret < p2.ret
+  for i in 0 ..< min(p1.params.len, p2.params.len):
+    if p1.params[i] != p2.params[i]:
+      return p1.params[i] < p2.params[i]
+  return p1.params.len < p2.params.len
 
 # Potentially useful bibliography
 #
@@ -51,17 +62,17 @@ type
     # Note: below fields are generally ordered from simplest to more complex
     # (in order of dependency)
     strings: CritBitTree[int]  # value: order of addition
-    types: CritBitTree[int]    # value: order of addition
+    types: SortedSet[string]
     typeLists: seq[seq[Type]]
     # NOTE: prototypes must have no duplicates, TODO: and be sorted by:
     # (ret's type ID; args' type ID)
-    prototypes: HashSet[Prototype]
+    prototypes: SortedSet[Prototype]
     # NOTE: fields must have no duplicates, TODO: and be sorted by:
     # (class type ID, field name's string ID, field's type ID)
-    fields: HashSet[tuple[class: Type, name: string, typ: Type]]
+    fields: SortedSet[tuple[class: Type, name: string, typ: Type]]
     # NOTE: methods must have no duplicates, TODO: and be sorted by:
     # (class type ID, name's string ID, prototype's proto ID)
-    methods: HashSet[tuple[class: Type, name: string, proto: Prototype]]
+    methods: SortedSet[tuple[class: Type, name: string, proto: Prototype]]
     classes*: seq[ClassDef]
   NotImplementedYetError* = object of CatchableError
   ConsistencyError* = object of CatchableError
@@ -141,7 +152,44 @@ proc newDex*(): Dex =
   init(result.methods)
 
 proc render*(dex: Dex): string =
-  # Collect strings and all the things
+  dex.collect()
+  var pos = 0
+  # We skip the header, as most of it can only be calculated after the rest of the segments.
+  pos += 0x60
+  # We preallocate space for the list of string offsets. We cannot fill it yet, as its contents
+  # will depend on the size of the other segments.
+  pos += 4 * dex.strings.len
+  #-- Render typeIDs.
+  let stringIds = dex.stringsOrdering
+  # dex.types are already stored sorted, same as dex.strings, so we don't need
+  # to sort again by type IDs
+  for t in dex.types:
+    pos += result.write(pos, stringIds[dex.strings[t]].uint32)
+  #-- Partially render proto IDs.
+  # We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
+  # segments inbetween.
+  for p in dex.prototypes:
+    pos += result.write(pos, stringIds[dex.strings[p.descriptor]].uint32)
+    pos += result.write(pos, dex.types.search(p.ret).uint32)
+    pos += 4
+    echo p.ret, " ", p.params
+  #-- Render field IDs
+  for f in dex.fields:
+    pos += result.write_ushort(pos, dex.types.search(f.class).uint16)
+    pos += result.write_ushort(pos, dex.types.search(f.typ).uint16)
+    pos += result.write(pos, stringIds[dex.strings[f.name]].uint32)
+  #-- Render method IDs
+  for m in dex.methods:
+    echo $m
+    pos += result.write_ushort(pos, dex.types.search(m.class).uint16)
+    pos += result.write_ushort(pos, dex.prototypes.search(m.proto).uint16)
+    pos += result.write(pos, stringIds[dex.strings[m.name]].uint32)
+
+  # let (s, off) = dex.renderStringsAndOffsets(228)
+  # return ' '.repeat(10) & s
+
+proc collect(dex: Dex) =
+  # Collect strings and all the things from classes.
   # (types, prototypes/signatures, fields, methods)
   for cd in dex.classes:
     dex.addType(cd.class)
@@ -163,8 +211,6 @@ proc render*(dex: Dex): string =
                 dex.addStr(s)
               MethodXXXX(m):
                 dex.addMethod(m)
-  let (s, off) = dex.renderStringsAndOffsets(228)
-  return ' '.repeat(10) & s
 
 proc sget_object(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
@@ -215,7 +261,7 @@ proc addTypeList(dex: Dex, ts: seq[Type]) =
 
 proc addType(dex: Dex, t: Type) =
   dex.addStr(t)
-  discard dex.types.containsOrIncl(t, dex.types.len)
+  dex.types.incl(t)
 
 proc addStr(dex: Dex, s: string) =
   if s.contains({'\x00', '\x80'..'\xFF'}):
@@ -252,13 +298,12 @@ proc renderStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
     pos += buf.write(pos, s & "\x00")
   return (buf, offsets)
 
-proc renderTypeIds(dex: Dex): string =
-  let stringIds = dex.stringsOrdering
-  # dex.types are already stored sorted, same as dex.strings, so we don't need
-  # to sort again by type IDs
-  var i = 0
-  for t in dex.types:
-    i += result.write(i, stringIds[dex.strings[t]].uint32)
+# proc renderTypeLists(dex: Dex): string =
+#   # FIXME(akavel): optimize proc stringsOrdering() to cache result
+#   let stringIds = dex.stringsOrdering
+#   var pos = 0
+#   for ts in dex.typeLists:
+#     pos += result.write(
 
 proc sample_dex(tail: string): string =
   var header = newString(0x2C)
@@ -296,6 +341,14 @@ proc write(s: var string, pos: int, what: uint32): int {.discardable.} =
   s.write(pos, buf)
   return 4
 
+proc write_ushort(s: var string, pos: int, what: uint16): int {.discardable.} =
+  # Little-endian
+  var buf = newString(2)
+  buf[0] = chr(what and 0xff)
+  buf[1] = chr(what shr 8 and 0xff)
+  s.write(pos, buf)
+  return 2
+
 proc write_uleb128(s: var string, pos: int, what: uint32): int =
   ## Writes an uint32 in ULEB128 (https://source.android.com/devices/tech/dalvik/dex-format#leb128)
   ## format, returning the number of bytes taken by the encoding.
@@ -328,4 +381,3 @@ proc adler32(s: string): uint32 =
     a = (a + c.uint32) mod MOD_ADLER
     b = (b + a) mod MOD_ADLER
   result = (b shl 16) or a
-
