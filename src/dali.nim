@@ -203,9 +203,18 @@ proc render*(dex: Dex): string =
     pos += result.write(pos, 0'u32)  # TODO: annotations_off
     pos += 4  # Here we'll need to fill class data offset
     pos += result.write(pos, 0'u32)  # TODO: static_values
-
-  # let (s, off) = dex.renderStringsAndOffsets(228)
-  # return ' '.repeat(10) & s
+  #-- Render code items
+  for cd in dex.classes:
+    for dm in cd.class_data.direct_methods:
+      if dm.code.kind == MaybeCodeKind.SomeCode:
+        let code = dm.code.code
+        pos += result.write_ushort(pos, code.registers)
+        pos += result.write_ushort(pos, code.ins)
+        pos += result.write_ushort(pos, code.outs)
+        pos += result.write_ushort(pos, 0'u16)   # TODO: tries_size
+        pos += result.write(pos, 0'u32)  # TODO: debug_info_off
+        pos += 4  # This shall be filled with size of instrs, in 16-bit code units
+        echo "TODO..."
 
 proc collect(dex: Dex) =
   # Collect strings and all the things from classes.
