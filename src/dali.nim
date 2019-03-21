@@ -180,10 +180,14 @@ proc render*(dex: Dex): string =
     pos += result.write(pos, stringIds[dex.strings[f.name]].uint32)
   #-- Render method IDs
   for m in dex.methods:
-    echo $m
+    # echo $m
     pos += result.write_ushort(pos, dex.types.search(m.class).uint16)
     pos += result.write_ushort(pos, dex.prototypes.search(m.proto).uint16)
     pos += result.write(pos, stringIds[dex.strings[m.name]].uint32)
+  #-- Render class defs
+  for c in dex.classes:
+    pos += result.write(pos, dex.types.search(c.class).uint32)
+    echo "TODO..."
 
   # let (s, off) = dex.renderStringsAndOffsets(228)
   # return ' '.repeat(10) & s
