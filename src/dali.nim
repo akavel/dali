@@ -18,6 +18,10 @@ proc `<`(p1, p2: Prototype): bool =
       return p1.params[i] < p2.params[i]
   return p1.params.len < p2.params.len
 
+converter toUint32[T: enum](s: set[T]): uint32 =
+  for v in s:
+    result = result or v.ord.uint32
+
 # Potentially useful bibliography
 #
 # DEX:
@@ -184,10 +188,21 @@ proc render*(dex: Dex): string =
     pos += result.write_ushort(pos, dex.types.search(m.class).uint16)
     pos += result.write_ushort(pos, dex.prototypes.search(m.proto).uint16)
     pos += result.write(pos, stringIds[dex.strings[m.name]].uint32)
-  #-- Render class defs
+  #-- Partially render class defs.
+  const NO_INDEX = 0xffff_ffff'u32
   for c in dex.classes:
     pos += result.write(pos, dex.types.search(c.class).uint32)
-    echo "TODO..."
+    pos += result.write(pos, c.access.uint32)
+    match c.superclass:
+      SomeType(t):
+        pos += result.write(pos, dex.types.search(t).uint32)
+      NoType:
+        pos += result.write(pos, NO_INDEX)
+    pos += result.write(pos, 0'u32)  # TODO: interfaces_off
+    pos += result.write(pos, NO_INDEX)  # TODO: source_file_idx
+    pos += result.write(pos, 0'u32)  # TODO: annotations_off
+    pos += 4  # Here we'll need to fill class data offset
+    pos += result.write(pos, 0'u32)  # TODO: static_values
 
   # let (s, off) = dex.renderStringsAndOffsets(228)
   # return ' '.repeat(10) & s
