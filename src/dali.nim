@@ -222,6 +222,13 @@ proc render*(dex: Dex): string =
     pos += result.write(pos, l.len.uint32)
     for t in l:
       pos += result.write_ushort(pos, dex.types.search(t).uint16)
+  #-- Render strings
+  for s in dex.stringsAsAdded:
+    # FIXME: MUTF-8: encode U+0000 as hex: C0 80
+    # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
+    # FIXME: length *in UTF-16 code units*, as ULEB128
+    pos += result.write_uleb128(pos, s.len.uint32)
+    pos += result.write(pos, s & "\x00")
 
 proc collect(dex: Dex) =
   # Collect strings and all the things from classes.
