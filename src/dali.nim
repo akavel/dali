@@ -157,6 +157,7 @@ proc newDex*(): Dex =
 
 proc render*(dex: Dex): string =
   dex.collect()
+  # FIXME: ensure correct padding everywhere
   var pos = 0
   # We skip the header, as most of it can only be calculated after the rest of the segments.
   pos += 0x60
@@ -215,7 +216,12 @@ proc render*(dex: Dex): string =
         pos += result.write(pos, 0'u32)  # TODO: debug_info_off
         pos += 4  # This shall be filled with size of instrs, in 16-bit code units
         pos += dex.renderInstrs(pos, result, code.instrs, stringIds)
-        echo "TODO..."
+  #-- Render type lists
+  for l in dex.typeLists:
+    pos += pad4b(pos)
+    pos += result.write(pos, l.len.uint32)
+    for t in l:
+      pos += result.write_ushort(pos, dex.types.search(t).uint16)
 
 proc collect(dex: Dex) =
   # Collect strings and all the things from classes.
@@ -243,6 +249,7 @@ proc collect(dex: Dex) =
 
 proc renderInstrs(dex: Dex, pos: int, buf: var string, instrs: openArray[Instr], stringIds: openArray[int]): int =
   var
+    pos0 = pos
     pos = pos
     high = true
   for instr in instrs:
@@ -266,6 +273,7 @@ proc renderInstrs(dex: Dex, pos: int, buf: var string, instrs: openArray[Instr],
           pos += buf.write_ushort(pos, stringIds[dex.strings[v]].uint16)
         MethodXXXX(v):
           pos += buf.write_ushort(pos, dex.methods.search((v.class, v.name, v.prototype)).uint16)
+  return pos - pos0
 
 proc sget_object(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
@@ -445,6 +453,8 @@ proc write_nibble(s: var string, pos: int, what: uint4, high: bool): int =
     s[pos] = chr(s[pos].ord.uint8 or what.uint8)
     return 1
 
+func pad4b(pos: int): int =
+  return (4 - (pos mod 4)) mod 4
 
 proc adler32(s: string): uint32 =
   # https://en.wikipedia.org/wiki/Adler-32
