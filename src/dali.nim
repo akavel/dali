@@ -214,6 +214,7 @@ proc render*(dex: Dex): string =
         pos += result.write_ushort(pos, 0'u16)   # TODO: tries_size
         pos += result.write(pos, 0'u32)  # TODO: debug_info_off
         pos += 4  # This shall be filled with size of instrs, in 16-bit code units
+        pos += dex.renderInstrs(pos, result, code.instrs, stringIds)
         echo "TODO..."
 
 proc collect(dex: Dex) =
@@ -240,6 +241,32 @@ proc collect(dex: Dex) =
               MethodXXXX(m):
                 dex.addMethod(m)
 
+proc renderInstrs(dex: Dex, pos: int, buf: var string, instrs: openArray[Instr], stringIds: openArray[int]): int =
+  var
+    pos = pos
+    high = true
+  for instr in instrs:
+    pos += buf.write(pos, instr.opcode.chr)
+    for arg in instr.args:
+      # FIXME(akavel): padding
+      match arg:
+        RawX(v):
+          pos += buf.write_nibble(pos, v, high)
+          high = not high
+        RawXX(v):
+          pos += buf.write(pos, $chr(v))
+        RegX(v):
+          pos += buf.write_nibble(pos, v, high)
+          high = not high
+        RegXX(v):
+          pos += buf.write(pos, $chr(v))
+        FieldXXXX(v):
+          pos += buf.write_ushort(pos, dex.fields.search((v.class, v.name, v.typ)).uint16)
+        StringXXXX(v):
+          pos += buf.write_ushort(pos, stringIds[dex.strings[v]].uint16)
+        MethodXXXX(v):
+          pos += buf.write_ushort(pos, dex.methods.search((v.class, v.name, v.prototype)).uint16)
+
 proc sget_object(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
 proc const_string(reg: uint8, s: String): Instr =
@@ -250,6 +277,13 @@ proc return_void(): Instr =
   return newInstr(0x0e, RawXX(0))
 
 proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
+  ## NOTE: We're assuming little endian encoding of the
+  ## file here; 8-bit args should be ordered in
+  ## "swapped order" vs. the one listed in official
+  ## Android bytecode spec (i.e., add lower byte first,
+  ## higher byte later). On the other hand, 16-bit
+  ## words should not have contents rotated (just fill
+  ## them as in the spec).
   return Instr(opcode: opcode, args: @args)
 
 proc addField(dex: Dex, f: Field) =
@@ -359,6 +393,9 @@ proc write(s: var string, pos: int, what: string): int {.discardable.} =
   copyMem(addr(s[pos]), cstring(what), what.len)
   return what.len
 
+proc write(s: var string, pos: int, what: char): int {.discardable.} =
+  return s.write(pos, $what)
+
 proc write(s: var string, pos: int, what: uint32): int {.discardable.} =
   # Little-endian
   var buf = newString(4)
@@ -398,6 +435,15 @@ proc write_uleb128(s: var string, pos: int, what: uint32): int =
   s.write(pos, buf)
   return n
 
+proc write_nibble(s: var string, pos: int, what: uint4, high: bool): int =
+  if pos >= s.len:
+    setLen(s, pos+1)
+  if high:
+    s[pos] = chr(what.uint8 shl 4)
+    return 0
+  else:
+    s[pos] = chr(s[pos].ord.uint8 or what.uint8)
+    return 1
 
 
 proc adler32(s: string): uint32 =
