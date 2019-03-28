@@ -169,10 +169,13 @@ proc render*(dex: Dex): string =
   # We skip the header, as most of it can only be calculated after the rest of the segments.
   sectionOffsets.add((0x0000'u16, 1'u32, blob.pos))
   blob.reserve(0x70)
+  #-- Partially render string_ids
   # We preallocate space for the list of string offsets. We cannot fill it yet, as its contents
   # will depend on the size of the other segments.
   sectionOffsets.add((0x0001'u16, dex.strings.len.uint32, blob.pos))
-  blob.reserve(4 * dex.strings.len)
+  var stringOffsets = newSeq[Slot32](dex.strings.len)
+  for i in 0 ..< dex.strings.len:
+    stringOffsets[i] = blob.slot32()
   #-- Render typeIDs.
   sectionOffsets.add((0x0002'u16, dex.types.len.uint32, blob.pos))
   let stringIds = dex.stringsOrdering
@@ -243,6 +246,8 @@ proc render*(dex: Dex): string =
   #-- Render strings data
   sectionOffsets.add((0x2002'u16, dex.strings.len.uint32, blob.pos))
   for s in dex.stringsAsAdded:
+    let slot = stringOffsets[stringIds[dex.strings[s]]]
+    blob.set(slot, blob.pos)
     # FIXME: MUTF-8: encode U+0000 as hex: C0 80
     # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
     # FIXME: length *in UTF-16 code units*, as ULEB128
