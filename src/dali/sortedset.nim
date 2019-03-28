@@ -1,7 +1,4 @@
 {.experimental: "codeReordering".}
-# import heapqueue
-# import algorithm
-# import sequtils
 
 type SortedSet*[T] = distinct seq[T]
 

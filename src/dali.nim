@@ -8,6 +8,7 @@ import tables
 import hashes
 import patty
 import dali/sortedset
+import dali/blob
 
 # NOTE(akavel): this must be early, to make sure it's used, as codeReordering fails to move it
 proc `<`(p1, p2: Prototype): bool =
@@ -164,118 +165,120 @@ proc render*(dex: Dex): string =
   var sectionOffsets = newSeq[tuple[typ: uint16, size: uint32, offset: uint32]]()
 
   # FIXME: ensure correct padding everywhere
-  var pos = 0
+  var blob = "".Blob
   # We skip the header, as most of it can only be calculated after the rest of the segments.
-  sectionOffsets.add((0x0000'u16, 1'u32, pos.uint32))
-  pos += 0x70
+  sectionOffsets.add((0x0000'u16, 1'u32, blob.pos))
+  blob.reserve(0x70)
   # We preallocate space for the list of string offsets. We cannot fill it yet, as its contents
   # will depend on the size of the other segments.
-  sectionOffsets.add((0x0001'u16, dex.strings.len.uint32, pos.uint32))
-  pos += 4 * dex.strings.len
+  sectionOffsets.add((0x0001'u16, dex.strings.len.uint32, blob.pos))
+  blob.reserve(4 * dex.strings.len)
   #-- Render typeIDs.
-  sectionOffsets.add((0x0002'u16, dex.types.len.uint32, pos.uint32))
+  sectionOffsets.add((0x0002'u16, dex.types.len.uint32, blob.pos))
   let stringIds = dex.stringsOrdering
   # dex.types are already stored sorted, same as dex.strings, so we don't need
   # to sort again by type IDs
   for t in dex.types:
-    pos += result.write(pos, stringIds[dex.strings[t]].uint32)
+    blob.put32(stringIds[dex.strings[t]].uint32)
   #-- Partially render proto IDs.
   # We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
   # segments inbetween.
-  sectionOffsets.add((0x0003'u16, dex.prototypes.len.uint32, pos.uint32))
+  sectionOffsets.add((0x0003'u16, dex.prototypes.len.uint32, blob.pos))
   for p in dex.prototypes:
-    pos += result.write(pos, stringIds[dex.strings[p.descriptor]].uint32)
-    pos += result.write(pos, dex.types.search(p.ret).uint32)
-    pos += 4
+    blob.put32(stringIds[dex.strings[p.descriptor]].uint32)
+    blob.put32(dex.types.search(p.ret).uint32)
+    blob.reserve(4)
     # echo p.ret, " ", p.params
   #-- Render field IDs
-  sectionOffsets.add((0x0004'u16, dex.fields.len.uint32, pos.uint32))
+  sectionOffsets.add((0x0004'u16, dex.fields.len.uint32, blob.pos))
   for f in dex.fields:
-    pos += result.write_ushort(pos, dex.types.search(f.class).uint16)
-    pos += result.write_ushort(pos, dex.types.search(f.typ).uint16)
-    pos += result.write(pos, stringIds[dex.strings[f.name]].uint32)
+    blob.put16(dex.types.search(f.class).uint16)
+    blob.put16(dex.types.search(f.typ).uint16)
+    blob.put32(stringIds[dex.strings[f.name]].uint32)
   #-- Render method IDs
-  sectionOffsets.add((0x0005'u16, dex.methods.len.uint32, pos.uint32))
+  sectionOffsets.add((0x0005'u16, dex.methods.len.uint32, blob.pos))
   for m in dex.methods:
     # echo $m
-    pos += result.write_ushort(pos, dex.types.search(m.class).uint16)
-    pos += result.write_ushort(pos, dex.prototypes.search(m.proto).uint16)
-    pos += result.write(pos, stringIds[dex.strings[m.name]].uint32)
+    blob.put16(dex.types.search(m.class).uint16)
+    blob.put16(dex.prototypes.search(m.proto).uint16)
+    blob.put32(stringIds[dex.strings[m.name]].uint32)
   #-- Partially render class defs.
-  sectionOffsets.add((0x0006'u16, dex.classes.len.uint32, pos.uint32))
+  sectionOffsets.add((0x0006'u16, dex.classes.len.uint32, blob.pos))
   const NO_INDEX = 0xffff_ffff'u32
   for c in dex.classes:
-    pos += result.write(pos, dex.types.search(c.class).uint32)
-    pos += result.write(pos, c.access.uint32)
+    blob.put32(dex.types.search(c.class).uint32)
+    blob.put32(c.access.uint32)
     match c.superclass:
       SomeType(t):
-        pos += result.write(pos, dex.types.search(t).uint32)
+        blob.put32(dex.types.search(t).uint32)
       NoType:
-        pos += result.write(pos, NO_INDEX)
-    pos += result.write(pos, 0'u32)  # TODO: interfaces_off
-    pos += result.write(pos, NO_INDEX)  # TODO: source_file_idx
-    pos += result.write(pos, 0'u32)  # TODO: annotations_off
-    pos += 4  # Here we'll need to fill class data offset
-    pos += result.write(pos, 0'u32)  # TODO: static_values
+        blob.put32(NO_INDEX)
+    blob.put32(0'u32)  # TODO: interfaces_off
+    blob.put32(NO_INDEX)  # TODO: source_file_idx
+    blob.put32(0'u32)  # TODO: annotations_off
+    blob.reserve(4)  # Here we'll need to fill class data offset
+    blob.put32(0'u32)  # TODO: static_values
   #-- Render code items
-  sectionOffsets.add((0x2001'u16, dex.classes.len.uint32, pos.uint32))
+  sectionOffsets.add((0x2001'u16, dex.classes.len.uint32, blob.pos))
   var codeOffsets = initTable[tuple[class: Type, name: string, proto: Prototype], uint32]()
   for cd in dex.classes:
     for dm in cd.class_data.direct_methods:
       if dm.code.kind == MaybeCodeKind.SomeCode:
         let code = dm.code.code
-        codeOffsets[dm.m.asTuple] = pos.uint32
-        pos += result.write_ushort(pos, code.registers)
-        pos += result.write_ushort(pos, code.ins)
-        pos += result.write_ushort(pos, code.outs)
-        pos += result.write_ushort(pos, 0'u16)   # TODO: tries_size
-        pos += result.write(pos, 0'u32)  # TODO: debug_info_off
-        pos += 4  # This shall be filled with size of instrs, in 16-bit code units
-        pos += dex.renderInstrs(pos, result, code.instrs, stringIds)
+        codeOffsets[dm.m.asTuple] = blob.pos
+        blob.put16(code.registers)
+        blob.put16(code.ins)
+        blob.put16(code.outs)
+        blob.put16(0'u16)  # TODO: tries_size
+        blob.put32(0'u32)  # TODO: debug_info_off
+        blob.reserve(4)    # This shall be filled with size of instrs, in 16-bit code units
+        dex.renderInstrs(blob, code.instrs, stringIds)
   #-- Render type lists
-  sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, pos.uint32))
+  sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, blob.pos))
   for l in dex.typeLists:
-    pos += pad4b(pos)
-    pos += result.write(pos, l.len.uint32)
+    blob.pad32()
+    blob.put32(l.len.uint32)
     for t in l:
-      pos += result.write_ushort(pos, dex.types.search(t).uint16)
+      blob.put16(dex.types.search(t).uint16)
   #-- Render strings data
-  sectionOffsets.add((0x2002'u16, dex.strings.len.uint32, pos.uint32))
+  sectionOffsets.add((0x2002'u16, dex.strings.len.uint32, blob.pos))
   for s in dex.stringsAsAdded:
     # FIXME: MUTF-8: encode U+0000 as hex: C0 80
     # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
     # FIXME: length *in UTF-16 code units*, as ULEB128
-    pos += result.write_uleb128(pos, s.len.uint32)
-    pos += result.write(pos, s & "\x00")
+    blob.put_uleb128(s.len.uint32)
+    blob.puts(s & "\x00")
   #-- Render class data
-  sectionOffsets.add((0x2000'u16, dex.classes.len.uint32, pos.uint32))
+  sectionOffsets.add((0x2000'u16, dex.classes.len.uint32, blob.pos))
   for c in dex.classes:
     let d = c.class_data
-    pos += result.write_uleb128(pos, 0)  # TODO: static_fields_size
-    pos += result.write_uleb128(pos, 0)  # TODO: instance_fields_size
-    pos += result.write_uleb128(pos, d.direct_methods.len.uint32)
-    pos += result.write_uleb128(pos, 0)  # TODO: virtual_methods_size
+    blob.put_uleb128(0)  # TODO: static_fields_size
+    blob.put_uleb128(0)  # TODO: instance_fields_size
+    blob.put_uleb128(d.direct_methods.len.uint32)
+    blob.put_uleb128(0)  # TODO: virtual_methods_size
     # TODO: static_fields
     # TODO: instance_fields
     var prev = 0
     for m in d.direct_methods:
       let tupl = m.m.asTuple
       let idx = dex.methods.search(tupl)
-      pos += result.write_uleb128(pos, uint32(idx - prev))
+      blob.put_uleb128(uint32(idx - prev))
       prev = idx
-      pos += result.write_uleb128(pos, m.access.toUint32)
+      blob.put_uleb128(m.access.toUint32)
       # echo codeOffsets[tupl].toHex
-      pos += result.write_uleb128(pos, codeOffsets[tupl])
+      blob.put_uleb128(codeOffsets[tupl])
     # TODO: virtual_methods
   #-- Render map_list
-  pos += pad4b(pos)
-  sectionOffsets.add((0x1000'u16, 1'u32, pos.uint32))
-  pos += result.write(pos, sectionOffsets.len.uint32)
+  blob.pad32()
+  sectionOffsets.add((0x1000'u16, 1'u32, blob.pos))
+  blob.put32(sectionOffsets.len.uint32)
   for s in sectionOffsets:
-    pos += result.write_ushort(pos, s.typ)
-    pos += 2  # unused
-    pos += result.write(pos, s.size)
-    pos += result.write(pos, s.offset)
+    blob.put16(s.typ)
+    blob.reserve(2)  # unused
+    blob.put32(s.size)
+    blob.put32(s.offset)
+
+  return blob.string
 
 
 proc collect(dex: Dex) =
@@ -302,33 +305,30 @@ proc collect(dex: Dex) =
               MethodXXXX(m):
                 dex.addMethod(m)
 
-proc renderInstrs(dex: Dex, pos: int, buf: var string, instrs: openArray[Instr], stringIds: openArray[int]): int =
+proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds: openArray[int]) =
   var
-    pos0 = pos
-    pos = pos
     high = true
   for instr in instrs:
-    pos += buf.write(pos, instr.opcode.chr)
+    blob.putc(instr.opcode.chr)
     for arg in instr.args:
       # FIXME(akavel): padding
       match arg:
         RawX(v):
-          pos += buf.write_nibble(pos, v, high)
+          blob.put4(v, high)
           high = not high
         RawXX(v):
-          pos += buf.write(pos, $chr(v))
+          blob.putc(v.chr)
         RegX(v):
-          pos += buf.write_nibble(pos, v, high)
+          blob.put4(v, high)
           high = not high
         RegXX(v):
-          pos += buf.write(pos, $chr(v))
+          blob.putc(v.chr)
         FieldXXXX(v):
-          pos += buf.write_ushort(pos, dex.fields.search((v.class, v.name, v.typ)).uint16)
+          blob.put16(dex.fields.search((v.class, v.name, v.typ)).uint16)
         StringXXXX(v):
-          pos += buf.write_ushort(pos, stringIds[dex.strings[v]].uint16)
+          blob.put16(stringIds[dex.strings[v]].uint16)
         MethodXXXX(v):
-          pos += buf.write_ushort(pos, dex.methods.search((v.class, v.name, v.prototype)).uint16)
-  return pos - pos0
+          blob.put16(dex.methods.search((v.class, v.name, v.prototype)).uint16)
 
 proc sget_object(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
