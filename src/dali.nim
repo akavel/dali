@@ -236,8 +236,9 @@ proc render*(dex: Dex): string =
         blob.put16(code.outs)
         blob.put16(0'u16)  # TODO: tries_size
         blob.put32(0'u32)  # TODO: debug_info_off
-        blob.reserve(4)    # This shall be filled with size of instrs, in 16-bit code units
+        let slot = blob.slot32() # This shall be filled with size of instrs, in 16-bit code units
         dex.renderInstrs(blob, code.instrs, stringIds)
+        blob.set(slot, (blob.pos - slot.uint32 - 4) div 2)
   #-- Render type lists
   sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, blob.pos))
   for l in dex.typeLists:
