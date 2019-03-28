@@ -23,7 +23,7 @@ proc incl*[T](s: var SortedSet[T], item: T) =
 
 proc `[]`*[T](s: SortedSet[T], i: int): T {.inline.} = seq[T](s)[i]
 
-proc len[T](s: SortedSet[T]): int {.inline.} = seq[T](s).len
+proc len*[T](s: SortedSet[T]): int {.inline.} = seq[T](s).len
 
 proc search*[T](s: SortedSet[T], item: T): int =
   # Based on algorithm.binarySearch, but returns position where element would be inserted if not found
