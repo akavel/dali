@@ -4,9 +4,23 @@ import bitops
 type
   Blob* = distinct string
   uint4* = range[0..15]   # "nibble" / hex digit / half-byte
+  Slot32* = distinct int
+  # Slot16* = distinct int
 
 proc reserve*(b: var Blob, n: int) {.inline.} =
   b.string.setLen(b.string.len + n)
+
+proc slot32*(b: var Blob): Slot32 {.inline.} =
+  result = b.string.len.Slot32
+  b.reserve(4)
+
+proc set*(b: var Blob, slot: Slot32, v: uint32) =
+  let i = slot.int
+  # Little-endian
+  b.string[i+0] = chr(v and 0xff)
+  b.string[i+1] = chr(v shr 8 and 0xff)
+  b.string[i+2] = chr(v shr 16 and 0xff)
+  b.string[i+3] = chr(v shr 24 and 0xff)
 
 proc pad32*(b: var Blob) {.inline.} =
   let n = (4 - (b.string.len mod 4)) mod 4
@@ -25,13 +39,7 @@ proc putc*(b: var Blob, v: char) {.inline.} =
   b.puts($v)
 
 proc put32*(b: var Blob, v: uint32) =
-  # Little-endian
-  var buf = newString(4)
-  buf[0] = chr(v and 0xff)
-  buf[1] = chr(v shr 8 and 0xff)
-  buf[2] = chr(v shr 16 and 0xff)
-  buf[3] = chr(v shr 24 and 0xff)
-  b.puts(buf)
+  b.set(b.slot32, v)
 
 proc put16*(b: var Blob, v: uint16) =
   # Little-endian
