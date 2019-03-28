@@ -8,7 +8,10 @@ type
   # Slot16* = distinct int
 
 proc reserve*(b: var Blob, n: int) {.inline.} =
-  b.string.setLen(b.string.len + n)
+  let pos = b.string.len
+  b.string.setLen(pos + n)
+  for i in pos ..< b.string.len:
+    b.string[i] = chr(0)
 
 proc slot32*(b: var Blob): Slot32 {.inline.} =
   result = b.string.len.Slot32

@@ -32,6 +32,12 @@ test "put32 little endian":
   s.put32(0x1234_5678)
   check s.string.toHex == strip_space"78 56 34 12"
 
+test "put32 x2":
+  var s = "".Blob
+  s.put32(0x1234_5678)
+  s.put32(0xdead_beef'u32)
+  check s.string.toHex == strip_space"78 56 34 12 EF BE AD DE"
+
 test "put16 little endian x2":
   var s = "".Blob
   s.put16(0x1234)
