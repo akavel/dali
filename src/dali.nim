@@ -4,6 +4,7 @@ import critbits
 import bitops
 import std/sha1
 import sets
+import tables
 import hashes
 import patty
 import sortedset
@@ -205,10 +206,12 @@ proc render*(dex: Dex): string =
     pos += 4  # Here we'll need to fill class data offset
     pos += result.write(pos, 0'u32)  # TODO: static_values
   #-- Render code items
+  var codeOffsets = initTable[tuple[class: Type, name: string, proto: Prototype], uint32]()
   for cd in dex.classes:
     for dm in cd.class_data.direct_methods:
       if dm.code.kind == MaybeCodeKind.SomeCode:
         let code = dm.code.code
+        codeOffsets[dm.m.asTuple] = pos.uint32
         pos += result.write_ushort(pos, code.registers)
         pos += result.write_ushort(pos, code.ins)
         pos += result.write_ushort(pos, code.outs)
@@ -240,11 +243,13 @@ proc render*(dex: Dex): string =
     # TODO: instance_fields
     var prev = 0
     for m in d.direct_methods:
-      let idx = dex.methods.search((m.m.class, m.m.name, m.m.prototype))
+      let tupl = m.m.asTuple
+      let idx = dex.methods.search(tupl)
       pos += result.write_uleb128(pos, uint32(idx - prev))
       prev = idx
       pos += result.write_uleb128(pos, m.access.toUint32)
-      pos += result.write_uleb128(pos, 0)  # FIXME: code offset
+      echo codeOffsets[tupl].toHex
+      pos += result.write_uleb128(pos, codeOffsets[tupl])  # FIXME: code offset
     # TODO: virtual_methods
 
 
@@ -470,6 +475,9 @@ proc write_nibble(s: var string, pos: int, what: uint4, high: bool): int =
   else:
     s[pos] = chr(s[pos].ord.uint8 or what.uint8)
     return 1
+
+func asTuple(m: Method): tuple[class: Type, name: string, proto: Prototype] =
+  return (class: m.class, name: m.name, proto: m.prototype)
 
 func pad4b(pos: int): int =
   return (4 - (pos mod 4)) mod 4
