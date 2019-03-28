@@ -459,9 +459,6 @@ proc write(s: var string, pos: int, what: string): int {.discardable.} =
   copyMem(addr(s[pos]), cstring(what), what.len)
   return what.len
 
-proc write(s: var string, pos: int, what: char): int {.discardable.} =
-  return s.write(pos, $what)
-
 proc write(s: var string, pos: int, what: uint32): int {.discardable.} =
   # Little-endian
   var buf = newString(4)
@@ -471,14 +468,6 @@ proc write(s: var string, pos: int, what: uint32): int {.discardable.} =
   buf[3] = chr(what shr 24 and 0xff)
   s.write(pos, buf)
   return 4
-
-proc write_ushort(s: var string, pos: int, what: uint16): int {.discardable.} =
-  # Little-endian
-  var buf = newString(2)
-  buf[0] = chr(what and 0xff)
-  buf[1] = chr(what shr 8 and 0xff)
-  s.write(pos, buf)
-  return 2
 
 proc write_uleb128(s: var string, pos: int, what: uint32): int =
   ## Writes an uint32 in ULEB128 (https://source.android.com/devices/tech/dalvik/dex-format#leb128)
@@ -501,21 +490,8 @@ proc write_uleb128(s: var string, pos: int, what: uint32): int =
   s.write(pos, buf)
   return n
 
-proc write_nibble(s: var string, pos: int, what: uint4, high: bool): int =
-  if pos >= s.len:
-    setLen(s, pos+1)
-  if high:
-    s[pos] = chr(what.uint8 shl 4)
-    return 0
-  else:
-    s[pos] = chr(s[pos].ord.uint8 or what.uint8)
-    return 1
-
 func asTuple(m: Method): tuple[class: Type, name: string, proto: Prototype] =
   return (class: m.class, name: m.name, proto: m.prototype)
-
-func pad4b(pos: int): int =
-  return (4 - (pos mod 4)) mod 4
 
 proc adler32(s: string): uint32 =
   # https://en.wikipedia.org/wiki/Adler-32
