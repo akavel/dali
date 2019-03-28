@@ -160,7 +160,7 @@ proc render*(dex: Dex): string =
   # FIXME: ensure correct padding everywhere
   var pos = 0
   # We skip the header, as most of it can only be calculated after the rest of the segments.
-  pos += 0x60
+  pos += 0x70
   # We preallocate space for the list of string offsets. We cannot fill it yet, as its contents
   # will depend on the size of the other segments.
   pos += 4 * dex.strings.len
