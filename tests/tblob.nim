@@ -14,6 +14,19 @@ test "puts":
   s.puts("world")
   check s.string == "hello world"
 
+test "pad32":
+  proc pad(s: string): string =
+    var b = "".Blob
+    b.puts(s)
+    b.pad32()
+    return b.string
+  check pad("") == ""
+  check pad("a") == "a\x00\x00\x00"
+  check pad("ab") == "ab\x00\x00"
+  check pad("abc") == "abc\x00"
+  check pad("abcd") == "abcd"
+  check pad("abcde") == "abcde\x00\x00\x00"
+
 test "put32 little endian":
   var s = "".Blob
   s.put32(0x1234_5678)

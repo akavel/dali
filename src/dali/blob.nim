@@ -8,7 +8,13 @@ type
 proc reserve*(b: var Blob, n: int) {.inline.} =
   b.string.setLen(b.string.len + n)
 
+proc pad32*(b: var Blob) {.inline.} =
+  let n = (4 - (b.string.len mod 4)) mod 4
+  b.reserve(n)
+
 proc puts*(b: var Blob, v: string) =
+  if v.len == 0:
+    return
   var s = b.string
   let pos = s.len
   s.setLen(pos + v.len)
