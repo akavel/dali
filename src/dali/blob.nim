@@ -1,11 +1,15 @@
 {.experimental: "codeReordering".}
 import bitops
+import tables
 
 type
   Blob* = distinct string
   uint4* = range[0..15]   # "nibble" / hex digit / half-byte
   Slot32* = distinct int
   # Slot16* = distinct int
+
+  Slots32*[T] = distinct TSlots32[T]
+  TSlots32[T] = Table[T, seq[Slot32]]
 
 proc reserve*(b: var Blob, n: int) {.inline.} =
   let pos = b.string.len
@@ -83,3 +87,17 @@ proc put4*(b: var Blob, v: uint4, high: bool) =
 
 proc pos*(b: var Blob): uint32 {.inline.} =
   return b.string.len.uint32
+
+
+proc newSlots32*[T](): Slots32[T] {.inline.} =
+  return initTable[T, seq[Slot32]]().Slots32[:T]
+
+proc add*[T](slots: var Slots32[T], key: T, val: Slot32) =
+  slots.TSlots32[:T].mgetOrPut(key, newSeq[Slot32]()).add(val)
+
+proc setAll*[T](slots: Slots32[T], key: T, val: uint32, blob: var Blob) =
+  if not slots.TSlots32[:T].contains(key):
+    return
+  for slot in slots.TSlots32[:T][key]:
+    blob.set(slot, val)
+

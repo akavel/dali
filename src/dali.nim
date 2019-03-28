@@ -187,10 +187,11 @@ proc render*(dex: Dex): string =
   # We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
   # segments inbetween.
   sectionOffsets.add((0x0003'u16, dex.prototypes.len.uint32, blob.pos))
+  var typeListOffsets = newSlots32[seq[Type]]()
   for p in dex.prototypes:
     blob.put32(stringIds[dex.strings[p.descriptor]].uint32)
     blob.put32(dex.types.search(p.ret).uint32)
-    blob.reserve(4)
+    typeListOffsets.add(p.params, blob.slot32())
     # echo p.ret, " ", p.params
   #-- Render field IDs
   sectionOffsets.add((0x0004'u16, dex.fields.len.uint32, blob.pos))
@@ -240,6 +241,7 @@ proc render*(dex: Dex): string =
   sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, blob.pos))
   for l in dex.typeLists:
     blob.pad32()
+    typeListOffsets.setAll(l, blob.pos, blob)
     blob.put32(l.len.uint32)
     for t in l:
       blob.put16(dex.types.search(t).uint16)
