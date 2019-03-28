@@ -187,7 +187,7 @@ proc render*(dex: Dex): string =
     pos += result.write(pos, stringIds[dex.strings[p.descriptor]].uint32)
     pos += result.write(pos, dex.types.search(p.ret).uint32)
     pos += 4
-    echo p.ret, " ", p.params
+    # echo p.ret, " ", p.params
   #-- Render field IDs
   sectionOffsets.add((0x0004'u16, dex.fields.len.uint32, pos.uint32))
   for f in dex.fields:
@@ -264,7 +264,7 @@ proc render*(dex: Dex): string =
       pos += result.write_uleb128(pos, uint32(idx - prev))
       prev = idx
       pos += result.write_uleb128(pos, m.access.toUint32)
-      echo codeOffsets[tupl].toHex
+      # echo codeOffsets[tupl].toHex
       pos += result.write_uleb128(pos, codeOffsets[tupl])
     # TODO: virtual_methods
   #-- Render map_list
