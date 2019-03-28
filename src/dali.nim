@@ -324,8 +324,15 @@ proc render*(dex: Dex): string =
     blob.put32(s.size)
     blob.put32(s.offset)
 
+  #-- Fill remaining slots related to file size
   blob.set(dataSizeSlot, blob.pos - dataStart)  # FIXME: round to 64?
   blob.set(fileSizeSlot, blob.pos)
+  #-- Fill checksums
+  let sha1 = secureHash(blob.string.substr(0x20))
+  let sha1sum = parseHexStr($sha1)  # FIXME(akavel): should not have to go through string!
+  for i in 0 ..< 20:
+    blob.string[0x0c + i] = sha1sum[i]
+  blob.set(adlerSumSlot, adler32(blob.string.substr(0x0c)))
   return blob.string
 
 
