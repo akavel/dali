@@ -222,13 +222,31 @@ proc render*(dex: Dex): string =
     pos += result.write(pos, l.len.uint32)
     for t in l:
       pos += result.write_ushort(pos, dex.types.search(t).uint16)
-  #-- Render strings
+  #-- Render strings data
   for s in dex.stringsAsAdded:
     # FIXME: MUTF-8: encode U+0000 as hex: C0 80
     # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
     # FIXME: length *in UTF-16 code units*, as ULEB128
     pos += result.write_uleb128(pos, s.len.uint32)
     pos += result.write(pos, s & "\x00")
+  #-- Render class data
+  for c in dex.classes:
+    let d = c.class_data
+    pos += result.write_uleb128(pos, 0)  # TODO: static_fields_size
+    pos += result.write_uleb128(pos, 0)  # TODO: instance_fields_size
+    pos += result.write_uleb128(pos, d.direct_methods.len.uint32)
+    pos += result.write_uleb128(pos, 0)  # TODO: virtual_methods_size
+    # TODO: static_fields
+    # TODO: instance_fields
+    var prev = 0
+    for m in d.direct_methods:
+      let idx = dex.methods.search((m.m.class, m.m.name, m.m.prototype))
+      pos += result.write_uleb128(pos, uint32(idx - prev))
+      prev = idx
+      pos += result.write_uleb128(pos, m.access.toUint32)
+      pos += result.write_uleb128(pos, 0)  # FIXME: code offset
+    # TODO: virtual_methods
+
 
 proc collect(dex: Dex) =
   # Collect strings and all the things from classes.
@@ -374,13 +392,6 @@ proc renderStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
     pos += buf.write_uleb128(pos, s.len.uint32)
     pos += buf.write(pos, s & "\x00")
   return (buf, offsets)
-
-# proc renderTypeLists(dex: Dex): string =
-#   # FIXME(akavel): optimize proc stringsOrdering() to cache result
-#   let stringIds = dex.stringsOrdering
-#   var pos = 0
-#   for ts in dex.typeLists:
-#     pos += result.write(
 
 proc sample_dex(tail: string): string =
   var header = newString(0x2C)
