@@ -7,7 +7,7 @@ import sets
 import tables
 import hashes
 import patty
-import sortedset
+import dali/sortedset
 
 # NOTE(akavel): this must be early, to make sure it's used, as codeReordering fails to move it
 proc `<`(p1, p2: Prototype): bool =
