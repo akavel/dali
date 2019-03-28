@@ -208,6 +208,7 @@ proc render*(dex: Dex): string =
     blob.put32(stringIds[dex.strings[m.name]].uint32)
   #-- Partially render class defs.
   sectionOffsets.add((0x0006'u16, dex.classes.len.uint32, blob.pos))
+  var classDataOffsets = newSlots32[Type]()
   const NO_INDEX = 0xffff_ffff'u32
   for c in dex.classes:
     blob.put32(dex.types.search(c.class).uint32)
@@ -220,7 +221,7 @@ proc render*(dex: Dex): string =
     blob.put32(0'u32)  # TODO: interfaces_off
     blob.put32(NO_INDEX)  # TODO: source_file_idx
     blob.put32(0'u32)  # TODO: annotations_off
-    blob.reserve(4)  # Here we'll need to fill class data offset
+    classDataOffsets.add(c.class, blob.slot32())
     blob.put32(0'u32)  # TODO: static_values
   #-- Render code items
   sectionOffsets.add((0x2001'u16, dex.classes.len.uint32, blob.pos))
@@ -258,6 +259,7 @@ proc render*(dex: Dex): string =
   #-- Render class data
   sectionOffsets.add((0x2000'u16, dex.classes.len.uint32, blob.pos))
   for c in dex.classes:
+    classDataOffsets.setAll(c.class, blob.pos, blob)
     let d = c.class_data
     blob.put_uleb128(0)  # TODO: static_fields_size
     blob.put_uleb128(0)  # TODO: instance_fields_size
