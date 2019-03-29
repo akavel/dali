@@ -262,8 +262,9 @@ proc render*(dex: Dex): string =
   blob.set(dataOffSlot, blob.pos)
   let dataStart = blob.pos
   var codeOffsets = initTable[tuple[class: Type, name: string, proto: Prototype], uint32]()
-  for cd in dex.classes:
-    for dm in cd.class_data.direct_methods:
+  for c in dex.classes:
+    let cd = c.class_data
+    for dm in cd.direct_methods & cd.virtual_methods:
       if dm.code.kind == MaybeCodeKind.SomeCode:
         let code = dm.code.code
         codeOffsets[dm.m.asTuple] = blob.pos
@@ -302,19 +303,11 @@ proc render*(dex: Dex): string =
     blob.put_uleb128(0)  # TODO: static_fields_size
     blob.put_uleb128(0)  # TODO: instance_fields_size
     blob.put_uleb128(d.direct_methods.len.uint32)
-    blob.put_uleb128(0)  # TODO: virtual_methods_size
+    blob.put_uleb128(d.virtual_methods.len.uint32)
     # TODO: static_fields
     # TODO: instance_fields
-    var prev = 0
-    for m in d.direct_methods:
-      let tupl = m.m.asTuple
-      let idx = dex.methods.search(tupl)
-      blob.put_uleb128(uint32(idx - prev))
-      prev = idx
-      blob.put_uleb128(m.access.toUint32)
-      # echo codeOffsets[tupl].toHex
-      blob.put_uleb128(codeOffsets[tupl])
-    # TODO: virtual_methods
+    dex.renderEncodedMethods(blob, d.direct_methods, codeOffsets)
+    dex.renderEncodedMethods(blob, d.virtual_methods, codeOffsets)
   #-- Render map_list
   blob.pad32()
   sectionOffsets.add((0x1000'u16, 1'u32, blob.pos))
@@ -341,11 +334,12 @@ proc render*(dex: Dex): string =
 proc collect(dex: Dex) =
   # Collect strings and all the things from classes.
   # (types, prototypes/signatures, fields, methods)
-  for cd in dex.classes:
-    dex.addType(cd.class)
-    if cd.superclass.kind == MaybeTypeKind.SomeType:
-      dex.addType(cd.superclass.typ)
-    for dm in cd.class_data.direct_methods:
+  for c in dex.classes:
+    dex.addType(c.class)
+    if c.superclass.kind == MaybeTypeKind.SomeType:
+      dex.addType(c.superclass.typ)
+    let cd = c.class_data
+    for dm in cd.direct_methods & cd.virtual_methods:
       dex.addMethod(dm.m)
       if dm.code.kind == MaybeCodeKind.SomeCode:
         for instr in dm.code.code.instrs:
@@ -362,6 +356,17 @@ proc collect(dex: Dex) =
                 dex.addStr(s)
               MethodXXXX(m):
                 dex.addMethod(m)
+
+proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: openArray[EncodedMethod], codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]) =
+  var prev = 0
+  for m in methods:
+    let tupl = m.m.asTuple
+    let idx = dex.methods.search(tupl)
+    blob.put_uleb128(uint32(idx - prev))
+    prev = idx
+    blob.put_uleb128(m.access.toUint32)
+    # echo codeOffsets[tupl].toHex
+    blob.put_uleb128(codeOffsets[tupl])
 
 proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds: openArray[int]) =
   var
