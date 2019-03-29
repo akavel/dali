@@ -127,7 +127,7 @@ type
     # static_fields*: ?
     # instance_fields*: ?
     direct_methods*: seq[EncodedMethod]
-    # virtual_methods*: ?
+    virtual_methods*: seq[EncodedMethod]
   EncodedMethod* = ref object
     m*: Method
     access*: set[Access]

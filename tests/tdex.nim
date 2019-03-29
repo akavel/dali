@@ -265,6 +265,72 @@ ac00 0000 0500 0000 0500 0000 d000 0000
 
 test "synthesized hello_android.apk":
   let dex = newDex()
+  #-- Prime some arrays, to make sure their order matches hello_android_apk
+  dex.addStr"<init>"
+  dex.addStr"I"
+  dex.addStr"Landroid/app/Activity;"
+  dex.addStr"Landroid/os/Bundle;"
+  dex.addStr"Lcom/android/hello/HelloAndroid;"
+  dex.addStr"V"
+  dex.addStr"VI"
+  dex.addStr"VL"
+  dex.addStr"onCreate"
+  dex.addStr"setContentView"
+  dex.addTypeList(@["I"])
+
+  dex.classes.add(ClassDef(
+    class: "Lcom/android/hello/HelloAndroid;",
+    access: {Public},
+    superclass: SomeType("Landroid/app/Activity;"),
+    class_data: ClassData(
+      direct_methods: @[
+        EncodedMethod(
+          m: Method(
+            class: "Lcom/android/hello/HelloAndroid;",
+            name: "<init>",
+            prototype: Prototype(ret: "V", params: @[]),
+          ),
+          access: {Public, Constructor},
+          code: SomeCode(Code(
+            registers: 1,
+            ins: 1,
+            outs: 1,
+            instrs: @[
+              invoke_direct(0, Method(class: "Landroid/app/Activity;", name: "<init>",
+                prototype: Prototype(ret: "V", params: @[]))),
+              return_void(),
+            ],
+          )),
+        ),
+      ],
+      virtual_methods: @[
+        EncodedMethod(
+          m: Method(
+            class: "Lcom/android/hello/HelloAndroid;",
+            name: "onCreate",
+            prototype: Prototype(
+              ret: "V",
+              params: @["Landroid/os/Bundle;"],
+            ),
+          ),
+          access: {Public},
+          code: SomeCode(Code(
+            registers: 3,
+            ins: 2,
+            outs: 2,
+            instrs: @[
+              invoke_super(1, 2, Method(class: "Landroid/app/Activity;", name: "onCreate",
+                prototype: Prototype(ret: "V", params: @["Landroid/os/Bundle;"]))),
+              const_high16(0, 0x7f03),
+              invoke_virtual(1, 0, Method(class: "Lcom/android/hello/HelloAndroid;", name: "setContentView",
+                prototype: Prototype(ret: "V", params: @["I"]))),
+              return_void(),
+            ],
+          )),
+        ),
+      ],
+    )
+  ))
   check dex.render.dumpHex == hello_android_apk.dumpHex
 
 proc tweak_prefix(s, prefix: string): string =
