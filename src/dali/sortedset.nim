@@ -10,7 +10,7 @@ proc incl*[T](s: var SortedSet[T], item: T) =
   let i = s.search(item)
   if i == s.len:
     seq[T](s).add(item)
-  elif s[i] != item:
+  elif item < s[i]:  # NOTE: we assume `<` is defined, but other operators like `==` may not
     seq[T](s).insert(item, i)
   # # HACK: 3 lines, as the following oneliner seems to fail with an error on Nim 19.4:
   # # (HeapQueue[T](s)).push(item)
@@ -47,6 +47,7 @@ iterator items*[T](s: SortedSet[T]): T =
 when isMainModule:
   var x = newSortedSet[int]()
   x.incl(5)
+  x.incl(3)
   x.incl(3)
   x.incl(4)
   for i in x:
