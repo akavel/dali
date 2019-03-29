@@ -222,8 +222,8 @@ proc render*(dex: Dex): string =
     typeListOffsets.add(p.params, blob.slot32())
     # echo p.ret, " ", p.params
   #-- Render field IDs
-  sectionOffsets.add((0x0004'u16, dex.fields.len.uint32, blob.pos))
   if dex.fields.len > 0:
+    sectionOffsets.add((0x0004'u16, dex.fields.len.uint32, blob.pos))
     blob.set(fieldIdsOffSlot, blob.pos)
   for f in dex.fields:
     blob.put16(dex.types.search(f.class).uint16)
@@ -275,7 +275,8 @@ proc render*(dex: Dex): string =
         dex.renderInstrs(blob, code.instrs, stringIds)
         blob.set(slot, (blob.pos - slot.uint32 - 4) div 2)
   #-- Render type lists
-  sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, blob.pos))
+  if dex.typeLists.len > 0:
+    sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, blob.pos))
   for l in dex.typeLists:
     blob.pad32()
     typeListOffsets.setAll(l, blob.pos, blob)
