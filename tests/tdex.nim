@@ -123,10 +123,11 @@ test "synthesized hello_world.apk":
         EncodedMethod(
           m: Method(
             class: "Lhw;",
+            name: "main",
             prototype: Prototype(
               ret: "V",
               params: @["[Ljava/lang/String;"]),
-            name: "main"),
+          ),
           access: {Public, Static},
           code: SomeCode(Code(
             registers: 2,
@@ -185,6 +186,36 @@ test "synthesized bugsnag.apk":
   dex.addStr"Lcom/bugsnag/dexexample/BugsnagApp;"
   dex.addStr"V"
   dex.addStr"""~~D8{"min-api":26,"version":"v0.1.14"}"""
+  dex.classes.add(ClassDef(
+    class: "Lcom/bugsnag/dexexample/BugsnagApp;",
+    access: {Public}, # TODO
+    superclass: SomeType("Landroid/app/Application;"),
+    class_data: ClassData(
+      direct_methods: @[
+        EncodedMethod(
+          m: Method(
+            class: "Lcom/bugsnag/dexexample/BugsnagApp;",
+            name: "<init>",
+            prototype: Prototype(
+              ret: "V",
+              params: @[],
+            ),
+          ),
+          access: {Public, Constructor},
+          code: SomeCode(Code(
+            registers: 1,
+            ins: 1,
+            outs: 1,
+            instrs: @[
+              invoke_direct(0, Method(class: "Landroid/app/Application;", name: "<init>",
+                prototype: Prototype(ret: "V", params: @[]))),
+              return_void(),
+            ],
+          )),
+        )
+      ]
+    )
+  ))
   check dex.render.tweak_prefix("dex\x0a038").dumpHex == bugsnag_sample_apk.dumpHex
 
 proc tweak_prefix(s, prefix: string): string =

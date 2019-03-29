@@ -385,14 +385,16 @@ proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds:
         MethodXXXX(v):
           blob.put16(dex.methods.search((v.class, v.name, v.prototype)).uint16)
 
-proc sget_object(reg: uint8, field: Field): Instr =
-  return newInstr(0x62, RegXX(reg), FieldXXXX(field))
-proc const_string(reg: uint8, s: String): Instr =
-  return newInstr(0x1a, RegXX(reg), StringXXXX(s))
-proc invoke_virtual(regC: uint4, regD: uint4, m: Method): Instr =
-  return newInstr(0x6e, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
 proc return_void(): Instr =
   return newInstr(0x0e, RawXX(0))
+proc const_string(reg: uint8, s: String): Instr =
+  return newInstr(0x1a, RegXX(reg), StringXXXX(s))
+proc sget_object(reg: uint8, field: Field): Instr =
+  return newInstr(0x62, RegXX(reg), FieldXXXX(field))
+proc invoke_virtual(regC: uint4, regD: uint4, m: Method): Instr =
+  return newInstr(0x6e, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
+proc invoke_direct(regC: uint4, m: Method): Instr =
+  return newInstr(0x70, RawX(1), RawX(0), MethodXXXX(m), RawX(0), RegX(regC), RawXX(0))
 
 proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
   ## NOTE: We're assuming little endian encoding of the
