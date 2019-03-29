@@ -281,6 +281,7 @@ proc render*(dex: Dex): string =
   if codeItems > 0'u32:
     sectionOffsets.add((0x2001'u16, codeItems, codeOffset))
   #-- Render type lists
+  blob.pad32()
   if dex.typeLists.len > 0:
     sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, blob.pos))
   for l in dex.typeLists:
