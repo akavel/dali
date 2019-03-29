@@ -48,6 +48,7 @@ converter toUint32[T: enum](s: set[T]): uint32 =
 variant Arg:  # Argument of an instruction of Dalvik bytecode
   RawX(raw4: uint4)
   RawXX(raw8: uint8)
+  RawXXXX(raw16: uint16)
   RegX(reg4: uint4)
   RegXX(reg8: uint8)
   FieldXXXX(field16: Field)
@@ -352,6 +353,7 @@ proc collect(dex: Dex) =
             match arg:
               RawX(r): discard
               RawXX(r): discard
+              RawXXXX(r): discard
               RegX(r): discard
               RegXX(r): discard
               FieldXXXX(f):
@@ -374,6 +376,8 @@ proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds:
           high = not high
         RawXX(v):
           blob.putc(v.chr)
+        RawXXXX(v):
+          blob.put16(v)
         RegX(v):
           blob.put4(v, high)
           high = not high
@@ -388,12 +392,16 @@ proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds:
 
 proc return_void(): Instr =
   return newInstr(0x0e, RawXX(0))
+proc const_high16(reg: uint8, highBits: uint16): Instr =
+  return newInstr(0x15, RegXX(reg), RawXXXX(highBits))
 proc const_string(reg: uint8, s: String): Instr =
   return newInstr(0x1a, RegXX(reg), StringXXXX(s))
 proc sget_object(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
 proc invoke_virtual(regC: uint4, regD: uint4, m: Method): Instr =
   return newInstr(0x6e, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
+proc invoke_super(regC: uint4, regD: uint4, m: Method): Instr =
+  return newInstr(0x6f, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
 proc invoke_direct(regC: uint4, m: Method): Instr =
   return newInstr(0x70, RawX(1), RawX(0), MethodXXXX(m), RawX(0), RegX(regC), RawXX(0))
 
