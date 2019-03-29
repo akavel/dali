@@ -258,7 +258,8 @@ proc render*(dex: Dex): string =
     classDataOffsets.add(c.class, blob.slot32())
     blob.put32(0'u32)  # TODO: static_values
   #-- Render code items
-  sectionOffsets.add((0x2001'u16, dex.classes.len.uint32, blob.pos))
+  let codeOffset = blob.pos
+  var codeItems = 0'u32
   blob.set(dataOffSlot, blob.pos)
   let dataStart = blob.pos
   var codeOffsets = initTable[tuple[class: Type, name: string, proto: Prototype], uint32]()
@@ -266,6 +267,7 @@ proc render*(dex: Dex): string =
     let cd = c.class_data
     for dm in cd.direct_methods & cd.virtual_methods:
       if dm.code.kind == MaybeCodeKind.SomeCode:
+        inc(codeItems)
         let code = dm.code.code
         codeOffsets[dm.m.asTuple] = blob.pos
         blob.put16(code.registers)
@@ -276,6 +278,8 @@ proc render*(dex: Dex): string =
         let slot = blob.slot32() # This shall be filled with size of instrs, in 16-bit code units
         dex.renderInstrs(blob, code.instrs, stringIds)
         blob.set(slot, (blob.pos - slot.uint32 - 4) div 2)
+  if codeItems > 0'u32:
+    sectionOffsets.add((0x2001'u16, codeItems, codeOffset))
   #-- Render type lists
   if dex.typeLists.len > 0:
     sectionOffsets.add((0x1001'u16, dex.typeLists.len.uint32, blob.pos))
