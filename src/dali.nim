@@ -436,6 +436,8 @@ proc descriptor(proto: Prototype): string =
     result &= typeChar(p)
 
 proc addTypeList(dex: Dex, ts: seq[Type]) =
+  if ts.len == 0:
+    return
   for p in ts:
     dex.addType(p)
   if not dex.typeLists.contains(ts):
