@@ -141,6 +141,7 @@ type
     Final = 0x10
     Synchronized = 0x20
     Varargs = 0x80
+    Native = 0x100
     Interface = 0x200
     Abstract = 0x400
     Annotation = 0x2000
@@ -373,8 +374,10 @@ proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: openArray[EncodedMe
     blob.put_uleb128(uint32(idx - prev))
     prev = idx
     blob.put_uleb128(m.access.toUint32)
-    # echo codeOffsets[tupl].toHex
-    blob.put_uleb128(codeOffsets[tupl])
+    if Native notin m.access and Abstract notin m.access:
+      blob.put_uleb128(codeOffsets[tupl])
+    else:
+      blob.put_uleb128(0)
 
 proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds: openArray[int]) =
   var
@@ -405,6 +408,8 @@ proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds:
         MethodXXXX(v):
           blob.put16(dex.methods.search((v.class, v.name, v.prototype)).uint16)
 
+proc move_result_object*(reg: uint8): Instr =
+  return newInstr(0x0a, RegXX(reg))
 proc return_void*(): Instr =
   return newInstr(0x0e, RawXX(0))
 proc const_high16*(reg: uint8, highBits: uint16): Instr =
@@ -415,14 +420,28 @@ proc new_instance*(reg: uint8, t: Type): Instr =
   return newInstr(0x22, RegXX(reg), TypeXXXX(t))
 proc sget_object*(reg: uint8, field: Field): Instr =
   return newInstr(0x62, RegXX(reg), FieldXXXX(field))
+
+proc invoke_virtual*(regC: uint4, m: Method): Instr =
+  return newInvoke1(0x6e, regC, m)
 proc invoke_virtual*(regC: uint4, regD: uint4, m: Method): Instr =
-  return newInstr(0x6e, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
+  return newInvoke2(0x6e, regC, regD, m)
+
 proc invoke_super*(regC: uint4, regD: uint4, m: Method): Instr =
-  return newInstr(0x6f, RawX(2), RawX(0), MethodXXXX(m), RegX(regD), RegX(regC), RawXX(0))
+  return newInvoke2(0x6f, regC, regD, m)
+
 proc invoke_direct*(regC: uint4, m: Method): Instr =
-  return newInstr(0x70, RawX(1), RawX(0), MethodXXXX(m), RawX(0), RegX(regC), RawXX(0))
+  return newInvoke1(0x70, regC, m)
 proc invoke_direct*(regC: uint4, regD: uint4, m: Method): Instr =
-  return newInstr(0x70, RawX(2), RawX(0), MethodXXXX(m), RawX(regD), RegX(regC), RawXX(0))
+  return newInvoke2(0x70, regC, regD, m)
+
+proc invoke_static*(regC: uint4, m: Method): Instr =
+  return newInvoke1(0x71, regC, m)
+
+
+proc newInvoke1(opcode: uint8, regC: uint4, m: Method): Instr =
+  return newInstr(opcode, RawX(1), RawX(0), MethodXXXX(m), RawX(0), RegX(regC), RawXX(0))
+proc newInvoke2(opcode: uint8, regC: uint4, regD: uint4, m: Method): Instr =
+  return newInstr(opcode, RawX(2), RawX(0), MethodXXXX(m), RawX(regD), RegX(regC), RawXX(0))
 
 proc newInstr(opcode: uint8, args: varargs[Arg]): Instr =
   ## NOTE: We're assuming little endian encoding of the
