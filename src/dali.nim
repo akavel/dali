@@ -409,7 +409,7 @@ proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds:
           blob.put16(dex.methods.search((v.class, v.name, v.prototype)).uint16)
 
 proc move_result_object*(reg: uint8): Instr =
-  return newInstr(0x0a, RegXX(reg))
+  return newInstr(0x0c, RegXX(reg))
 proc return_void*(): Instr =
   return newInstr(0x0e, RawXX(0))
 proc const_high16*(reg: uint8, highBits: uint16): Instr =

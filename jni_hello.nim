@@ -31,7 +31,7 @@ dex.classes.add(ClassDef(
         access: {Static, Constructor},
         code: SomeCode(Code(
           registers: 2,
-          ins: 1,
+          ins: 0,
           outs: 1,
           instrs: @[
             # System.loadLibrary("hello-mello")
