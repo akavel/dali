@@ -34,4 +34,13 @@
 #     #return_void()
 #   stringFromJNI(): String {.public, native.}
 
+# type JType = distinct string
 
+# func jtype(humanReadable: string): JType =
+#   case humanReadable
+#   else:
+#     return JType("L" & humanReadable.replace('.', '/') & ";")
+
+#TODO:
+# static:
+#   writeFile(...)
