@@ -173,26 +173,26 @@ proc render*(dex: Dex): string =
   # Most of it can only be calculated after the rest of the segments.
   sectionOffsets.add((0x0000'u16, 1'u32, blob.pos))
   # TODO: handle various versions of targetSdkVersion file, not only 035
-  blob.puts("dex\n035\x00")  # Magic prefix
+  blob.puts "dex\n035\x00"   # Magic prefix
   let adlerSumSlot = blob.slot32()
-  blob.reserve(20)        # TODO: Fill sha1 sum
+  blob.reserve 20         # TODO: Fill sha1 sum
   let fileSizeSlot = blob.slot32()
-  blob.put32(0x70)        # Header size
-  blob.put32(0x12345678)  # Endian constant
-  blob.put32(0)           # link_size
-  blob.put32(0)           # link_off
+  blob.put32 0x70         # Header size
+  blob.put32 0x12345678   # Endian constant
+  blob.put32 0            # link_size
+  blob.put32 0            # link_off
   let mapOffsetSlot = blob.slot32()
-  blob.put32(dex.strings.len.uint32)
+  blob.put32 dex.strings.len.uint32
   let stringIdsOffSlot = blob.slot32()
-  blob.put32(dex.types.len.uint32)
+  blob.put32 dex.types.len.uint32
   let typeIdsOffSlot = blob.slot32()
-  blob.put32(dex.prototypes.len.uint32)
+  blob.put32 dex.prototypes.len.uint32
   let protoIdsOffSlot = blob.slot32()
-  blob.put32(dex.fields.len.uint32)
+  blob.put32 dex.fields.len.uint32
   let fieldIdsOffSlot = blob.slot32()
-  blob.put32(dex.methods.len.uint32)
+  blob.put32 dex.methods.len.uint32
   let methodIdsOffSlot = blob.slot32()
-  blob.put32(dex.classes.len.uint32)
+  blob.put32 dex.classes.len.uint32
   let classDefsOffSlot = blob.slot32()
   let dataSizeSlot = blob.slot32()
   let dataOffSlot = blob.slot32()
@@ -212,7 +212,7 @@ proc render*(dex: Dex): string =
   # dex.types are already stored sorted, same as dex.strings, so we don't need
   # to sort again by type IDs
   for t in dex.types:
-    blob.put32(stringIds[dex.strings[t]].uint32)
+    blob.put32 stringIds[dex.strings[t]].uint32
   #-- Partially render proto IDs.
   # We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
   # segments inbetween.
@@ -220,8 +220,8 @@ proc render*(dex: Dex): string =
   blob.set(protoIdsOffSlot, blob.pos)
   var typeListOffsets = newSlots32[seq[Type]]()
   for p in dex.prototypes:
-    blob.put32(stringIds[dex.strings[p.descriptor]].uint32)
-    blob.put32(dex.types.search(p.ret).uint32)
+    blob.put32 stringIds[dex.strings[p.descriptor]].uint32
+    blob.put32 dex.types.search(p.ret).uint32
     typeListOffsets.add(p.params, blob.slot32())
     # echo p.ret, " ", p.params
   #-- Render field IDs
@@ -229,36 +229,36 @@ proc render*(dex: Dex): string =
     sectionOffsets.add((0x0004'u16, dex.fields.len.uint32, blob.pos))
     blob.set(fieldIdsOffSlot, blob.pos)
   for f in dex.fields:
-    blob.put16(dex.types.search(f.class).uint16)
-    blob.put16(dex.types.search(f.typ).uint16)
-    blob.put32(stringIds[dex.strings[f.name]].uint32)
+    blob.put16 dex.types.search(f.class).uint16
+    blob.put16 dex.types.search(f.typ).uint16
+    blob.put32 stringIds[dex.strings[f.name]].uint32
   #-- Render method IDs
   sectionOffsets.add((0x0005'u16, dex.methods.len.uint32, blob.pos))
   if dex.methods.len > 0:
     blob.set(methodIdsOffSlot, blob.pos)
   for m in dex.methods:
     # echo $m
-    blob.put16(dex.types.search(m.class).uint16)
-    blob.put16(dex.prototypes.search(m.proto).uint16)
-    blob.put32(stringIds[dex.strings[m.name]].uint32)
+    blob.put16 dex.types.search(m.class).uint16
+    blob.put16 dex.prototypes.search(m.proto).uint16
+    blob.put32 stringIds[dex.strings[m.name]].uint32
   #-- Partially render class defs.
   sectionOffsets.add((0x0006'u16, dex.classes.len.uint32, blob.pos))
   blob.set(classDefsOffSlot, blob.pos)
   var classDataOffsets = newSlots32[Type]()
   const NO_INDEX = 0xffff_ffff'u32
   for c in dex.classes:
-    blob.put32(dex.types.search(c.class).uint32)
-    blob.put32(c.access.uint32)
+    blob.put32 dex.types.search(c.class).uint32
+    blob.put32 c.access.uint32
     match c.superclass:
       SomeType(t):
-        blob.put32(dex.types.search(t).uint32)
+        blob.put32 dex.types.search(t).uint32
       NoType:
-        blob.put32(NO_INDEX)
-    blob.put32(0'u32)  # TODO: interfaces_off
-    blob.put32(NO_INDEX)  # TODO: source_file_idx
-    blob.put32(0'u32)  # TODO: annotations_off
+        blob.put32 NO_INDEX
+    blob.put32 0'u32      # TODO: interfaces_off
+    blob.put32 NO_INDEX   # TODO: source_file_idx
+    blob.put32 0'u32      # TODO: annotations_off
     classDataOffsets.add(c.class, blob.slot32())
-    blob.put32(0'u32)  # TODO: static_values
+    blob.put32 0'u32      # TODO: static_values
   #-- Render code items
   let codeOffset = blob.pos
   var codeItems = 0'u32
@@ -272,11 +272,11 @@ proc render*(dex: Dex): string =
         inc(codeItems)
         let code = dm.code.code
         codeOffsets[dm.m.asTuple] = blob.pos
-        blob.put16(code.registers)
-        blob.put16(code.ins)
-        blob.put16(code.outs)
-        blob.put16(0'u16)  # TODO: tries_size
-        blob.put32(0'u32)  # TODO: debug_info_off
+        blob.put16 code.registers
+        blob.put16 code.ins
+        blob.put16 code.outs
+        blob.put16 0'u16   # TODO: tries_size
+        blob.put32 0'u32   # TODO: debug_info_off
         let slot = blob.slot32() # This shall be filled with size of instrs, in 16-bit code units
         dex.renderInstrs(blob, code.instrs, stringIds)
         blob.set(slot, (blob.pos - slot.uint32 - 4) div 2)
@@ -289,9 +289,9 @@ proc render*(dex: Dex): string =
   for l in dex.typeLists:
     blob.pad32()
     typeListOffsets.setAll(l, blob.pos, blob)
-    blob.put32(l.len.uint32)
+    blob.put32 l.len.uint32
     for t in l:
-      blob.put16(dex.types.search(t).uint16)
+      blob.put16 dex.types.search(t).uint16
   #-- Render strings data
   sectionOffsets.add((0x2002'u16, dex.strings.len.uint32, blob.pos))
   for s in dex.stringsAsAdded:
@@ -300,17 +300,17 @@ proc render*(dex: Dex): string =
     # FIXME: MUTF-8: encode U+0000 as hex: C0 80
     # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
     # FIXME: length *in UTF-16 code units*, as ULEB128
-    blob.put_uleb128(s.len.uint32)
-    blob.puts(s & "\x00")
+    blob.put_uleb128 s.len.uint32
+    blob.puts s & "\x00"
   #-- Render class data
   sectionOffsets.add((0x2000'u16, dex.classes.len.uint32, blob.pos))
   for c in dex.classes:
     classDataOffsets.setAll(c.class, blob.pos, blob)
     let d = c.class_data
-    blob.put_uleb128(0)  # TODO: static_fields_size
-    blob.put_uleb128(0)  # TODO: instance_fields_size
-    blob.put_uleb128(d.direct_methods.len.uint32)
-    blob.put_uleb128(d.virtual_methods.len.uint32)
+    blob.put_uleb128 0  # TODO: static_fields_size
+    blob.put_uleb128 0  # TODO: instance_fields_size
+    blob.put_uleb128 d.direct_methods.len.uint32
+    blob.put_uleb128 d.virtual_methods.len.uint32
     # TODO: static_fields
     # TODO: instance_fields
     dex.renderEncodedMethods(blob, d.direct_methods, codeOffsets)
@@ -319,12 +319,12 @@ proc render*(dex: Dex): string =
   blob.pad32()
   sectionOffsets.add((0x1000'u16, 1'u32, blob.pos))
   blob.set(mapOffsetSlot, blob.pos)
-  blob.put32(sectionOffsets.len.uint32)
+  blob.put32 sectionOffsets.len.uint32
   for s in sectionOffsets:
-    blob.put16(s.typ)
-    blob.reserve(2)  # unused
-    blob.put32(s.size)
-    blob.put32(s.offset)
+    blob.put16 s.typ
+    blob.reserve 2   # unused
+    blob.put32 s.size
+    blob.put32 s.offset
 
   #-- Fill remaining slots related to file size
   blob.set(dataSizeSlot, blob.pos - dataStart)  # FIXME: round to 64?
@@ -371,42 +371,42 @@ proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: openArray[EncodedMe
   for m in methods:
     let tupl = m.m.asTuple
     let idx = dex.methods.search(tupl)
-    blob.put_uleb128(uint32(idx - prev))
+    blob.put_uleb128 uint32(idx - prev)
     prev = idx
-    blob.put_uleb128(m.access.toUint32)
+    blob.put_uleb128 m.access.toUint32
     if Native notin m.access and Abstract notin m.access:
-      blob.put_uleb128(codeOffsets[tupl])
+      blob.put_uleb128 codeOffsets[tupl]
     else:
-      blob.put_uleb128(0)
+      blob.put_uleb128 0
 
 proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds: openArray[int]) =
   var
     high = true
   for instr in instrs:
-    blob.putc(instr.opcode.chr)
+    blob.putc instr.opcode.chr
     for arg in instr.args:
       # FIXME(akavel): padding
       match arg:
         RawX(v):
-          blob.put4(v, high)
+          blob.put4 v, high
           high = not high
         RawXX(v):
-          blob.putc(v.chr)
+          blob.putc v.chr
         RawXXXX(v):
-          blob.put16(v)
+          blob.put16 v
         RegX(v):
-          blob.put4(v, high)
+          blob.put4 v, high
           high = not high
         RegXX(v):
-          blob.putc(v.chr)
+          blob.putc v.chr
         FieldXXXX(v):
-          blob.put16(dex.fields.search((v.class, v.name, v.typ)).uint16)
+          blob.put16 dex.fields.search((v.class, v.name, v.typ)).uint16
         StringXXXX(v):
-          blob.put16(stringIds[dex.strings[v]].uint16)
+          blob.put16 stringIds[dex.strings[v]].uint16
         TypeXXXX(v):
-          blob.put16(dex.types.search(v).uint16)
+          blob.put16 dex.types.search(v).uint16
         MethodXXXX(v):
-          blob.put16(dex.methods.search((v.class, v.name, v.prototype)).uint16)
+          blob.put16 dex.methods.search((v.class, v.name, v.prototype)).uint16
 
 proc move_result_object*(reg: uint8): Instr =
   return newInstr(0x0c, RegXX(reg))
