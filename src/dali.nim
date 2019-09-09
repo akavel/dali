@@ -102,6 +102,11 @@ type
 
   uint4* = range[0..15]   # e.g. register v0..v15
 
+func equals*(a, b: Method): bool =
+  a.class == b.class and a.name == b.name and a.prototype.equals(b.prototype)
+func equals*(a, b: Prototype): bool =
+  a.ret == b.ret and a.params == b.params
+
 type
   Instr* = ref object
     opcode: uint8
