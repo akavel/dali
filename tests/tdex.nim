@@ -146,6 +146,42 @@ test "synthesized hello_world.apk":
   ))
   check dex.render.dumpHex == hello_world_apk.dumpHex
 
+test "synthesized hello_world.apk prettified with macros":
+  let
+    dex = newDex()
+    PrintStream = "Ljava/io/PrintStream;"
+    String = "Ljava/lang/String;"
+  dex.classes.add(ClassDef(
+    class: "Lhw;",
+    access: {Public},
+    superclass: SomeType("Ljava/lang/Object;"),
+    class_data: ClassData(
+      direct_methods: @[
+        EncodedMethod(
+          m: Method(
+            class: "Lhw;",
+            name: "main",
+            prototype: Prototype(
+              ret: "V",
+              params: @["[Ljava/lang/String;"]),
+          ),
+          access: {Public, Static},
+          code: SomeCode(Code(
+            registers: 2,
+            ins: 1,
+            outs: 2,
+            instrs: @[
+              sget_object(0, Field(class: "Ljava/lang/System;", typ: "Ljava/io/PrintStream;", name: "out")),
+              const_string(1, "Hello World!"),
+              invoke_virtual(0, 1, jproto PrintStream.println(String)),
+              return_void(),
+            ]))
+        )
+      ]
+    )
+  ))
+  check dex.render.dumpHex == hello_world_apk.dumpHex
+
 test "hello world.apk":
   # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
   let want = hello_world_apk
@@ -209,6 +245,43 @@ test "synthesized bugsnag.apk (FIXME: except checksums)":
             instrs: @[
               invoke_direct(0, Method(class: "Landroid/app/Application;", name: "<init>",
                 prototype: Prototype(ret: "V", params: @[]))),
+              return_void(),
+            ],
+          )),
+        )
+      ]
+    )
+  ))
+  # check dex.render.tweak_prefix("dex\x0a038").dumpHex == bugsnag_sample_apk.dumpHex
+  # FIXME(akavel): don't know why, but the SHA1 sum in bugsnag_sample_apk seems incorrect (!)
+  check dex.render.substr(0x20).dumpHex == bugsnag_sample_apk.substr(0x20).dumpHex
+
+test "synthesized bugsnag.apk (FIXME: except checksums) prettified with macros":
+  let
+    dex = newDex()
+    BugsnagApp = "Lcom/bugsnag/dexexample/BugsnagApp;"
+    Application = "Landroid/app/Application;"
+  #-- Prime some strings, to make sure their order matches bugsnag_sample_apk
+  dex.addStr"<init>"
+  dex.addStr"Landroid/app/Application;"
+  dex.addStr"Lcom/bugsnag/dexexample/BugsnagApp;"
+  dex.addStr"V"
+  dex.addStr"""~~D8{"min-api":26,"version":"v0.1.14"}"""
+  dex.classes.add(ClassDef(
+    class: "Lcom/bugsnag/dexexample/BugsnagApp;",
+    access: {Public}, # TODO
+    superclass: SomeType("Landroid/app/Application;"),
+    class_data: ClassData(
+      direct_methods: @[
+        EncodedMethod(
+          m: jproto BugsnagApp.`<init>`(),
+          access: {Public, Constructor},
+          code: SomeCode(Code(
+            registers: 1,
+            ins: 1,
+            outs: 1,
+            instrs: @[
+              invoke_direct(0, jproto Application.`<init>`()),
               return_void(),
             ],
           )),
@@ -324,6 +397,66 @@ test "synthesized hello_android.apk":
               const_high16(0, 0x7f03),
               invoke_virtual(1, 0, Method(class: "Lcom/android/hello/HelloAndroid;", name: "setContentView",
                 prototype: Prototype(ret: "V", params: @["I"]))),
+              return_void(),
+            ],
+          )),
+        ),
+      ],
+    )
+  ))
+  check dex.render.dumpHex == hello_android_apk.dumpHex
+
+test "synthesized hello_android.apk prettified with macros":
+  let
+    dex = newDex()
+    HelloAndroid = "Lcom/android/hello/HelloAndroid;"
+    Activity = "Landroid/app/Activity;"
+    Bundle = "Landroid/os/Bundle;"
+  #-- Prime some arrays, to make sure their order matches hello_android_apk
+  dex.addStr"<init>"
+  dex.addStr"I"
+  dex.addStr"Landroid/app/Activity;"
+  dex.addStr"Landroid/os/Bundle;"
+  dex.addStr"Lcom/android/hello/HelloAndroid;"
+  dex.addStr"V"
+  dex.addStr"VI"
+  dex.addStr"VL"
+  dex.addStr"onCreate"
+  dex.addStr"setContentView"
+  dex.addTypeList(@["I"])
+
+  dex.classes.add(ClassDef(
+    class: "Lcom/android/hello/HelloAndroid;",
+    access: {Public},
+    superclass: SomeType("Landroid/app/Activity;"),
+    class_data: ClassData(
+      direct_methods: @[
+        EncodedMethod(
+          m: jproto HelloAndroid.`<init>`(),
+          access: {Public, Constructor},
+          code: SomeCode(Code(
+            registers: 1,
+            ins: 1,
+            outs: 1,
+            instrs: @[
+              invoke_direct(0, jproto Activity.`<init>`()),
+              return_void(),
+            ],
+          )),
+        ),
+      ],
+      virtual_methods: @[
+        EncodedMethod(
+          m: jproto HelloAndroid.onCreate(Bundle),
+          access: {Public},
+          code: SomeCode(Code(
+            registers: 3,
+            ins: 2,
+            outs: 2,
+            instrs: @[
+              invoke_super(1, 2, jproto Activity.onCreate(Bundle)),
+              const_high16(0, 0x7f03),
+              invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int)),
               return_void(),
             ],
           )),
