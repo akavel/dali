@@ -8,61 +8,24 @@ const
   HelloActivity = "Lcom/akavel/hello/HelloActivity;"
   Bundle = "Landroid/os/Bundle;"
   TextView = "Landroid/widget/TextView;"
+  Context = "Landroid/content/Context;"
+  CharSequence = "Ljava/lang/CharSequence;"
+  View = "Landroid/view/View;"
 
 var dex = newDex()
-dex.classes.add(ClassDef(
-  class: HelloActivity,
-  access: {Public},
-  superclass: SomeType(Activity),
-  class_data: ClassData(
-    direct_methods: @[
-      EncodedMethod(
-        m: Method(
-          class: HelloActivity,
-          name: "<init>",
-          prototype: Prototype(ret: "V", params: @[]),
-        ),
-        access: {Public, Constructor},
-        code: SomeCode(Code(
-          registers: 1,
-          ins: 1,
-          outs: 1,
-          instrs: @[
-            invoke_direct(0, Method(class: Activity, name: "<init>",
-              prototype: Prototype(ret: "V", params: @[]))),
-            return_void(),
-          ],
-        )),
-      ),
-    ],
-    virtual_methods: @[
-      EncodedMethod(
-        m: Method(
-          class: HelloActivity,
-          name: "onCreate",
-          prototype: Prototype(ret: "V", params: @[Bundle])),
-        access: {Public},
-        code: SomeCode(Code(
-          registers: 4,
-          ins: 2,
-          outs: 2,  # TODO(akavel): what does this really mean???
-          instrs: @[
-            invoke_super(2, 3, Method(class: Activity, name: "onCreate",
-              prototype: Prototype(ret: "V", params: @[Bundle]))),
-            new_instance(0, TextView),
-            invoke_direct(0, 2, Method(class: TextView, name: "<init>",
-              prototype: Prototype(ret: "V", params: @["Landroid/content/Context;"]))),
-            const_string(1, "Hello dali!"),
-            invoke_virtual(0, 1, Method(class: TextView, name: "setText",
-              prototype: Prototype(ret: "V", params: @["Ljava/lang/CharSequence;"]))),
-            invoke_virtual(2, 0, Method(class: HelloActivity, name: "setContentView",
-              prototype: Prototype(ret: "V", params: @["Landroid/view/View;"]))),
-            return_void(),
-          ],
-        )),
-      ),
-    ]
-  )
-))
+dex.classes.add:
+  jclass com.akavel.hello.HelloActivity {.public.} of Activity:
+    proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
+      invoke_direct(0, jproto Activity.`<init>`())
+      return_void()
+    proc onCreate(Bundle) {.public, regs:4, ins:2, outs:2.} =
+      invoke_super(2, 3, jproto Activity.onCreate(Bundle))
+      new_instance(0, TextView)
+      invoke_direct(0, 2, jproto TextView.`<init>`(Context))
+      const_string(1, "Hello dali!")
+      invoke_virtual(0, 1, jproto TextView.setText(CharSequence))
+      invoke_virtual(2, 0, jproto HelloActivity.setContentView(View))
+      return_void()
+
 stdout.write(dex.render)
 
