@@ -261,34 +261,20 @@ test "synthesized bugsnag.apk (FIXME: except checksums) prettified with macros":
     dex = newDex()
     BugsnagApp = "Lcom/bugsnag/dexexample/BugsnagApp;"
     Application = "Landroid/app/Application;"
+
   #-- Prime some strings, to make sure their order matches bugsnag_sample_apk
-  dex.addStr"<init>"
-  dex.addStr"Landroid/app/Application;"
-  dex.addStr"Lcom/bugsnag/dexexample/BugsnagApp;"
-  dex.addStr"V"
-  dex.addStr"""~~D8{"min-api":26,"version":"v0.1.14"}"""
-  dex.classes.add(ClassDef(
-    class: "Lcom/bugsnag/dexexample/BugsnagApp;",
-    access: {Public}, # TODO
-    superclass: SomeType("Landroid/app/Application;"),
-    class_data: ClassData(
-      direct_methods: @[
-        EncodedMethod(
-          m: jproto BugsnagApp.`<init>`(),
-          access: {Public, Constructor},
-          code: SomeCode(Code(
-            registers: 1,
-            ins: 1,
-            outs: 1,
-            instrs: @[
-              invoke_direct(0, jproto Application.`<init>`()),
-              return_void(),
-            ],
-          )),
-        )
-      ]
-    )
-  ))
+  dex.addStr "<init>"
+  dex.addStr Application
+  dex.addStr BugsnagApp
+  dex.addStr "V"
+  dex.addStr """~~D8{"min-api":26,"version":"v0.1.14"}"""
+
+  dex.classes.add:
+    jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
+      proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
+        invoke_direct(0, jproto Application.`<init>`())
+        return_void()
+
   # check dex.render.tweak_prefix("dex\x0a038").dumpHex == bugsnag_sample_apk.dumpHex
   # FIXME(akavel): don't know why, but the SHA1 sum in bugsnag_sample_apk seems incorrect (!)
   check dex.render.substr(0x20).dumpHex == bugsnag_sample_apk.substr(0x20).dumpHex
@@ -413,57 +399,29 @@ test "synthesized hello_android.apk prettified with macros":
     Activity = "Landroid/app/Activity;"
     Bundle = "Landroid/os/Bundle;"
   #-- Prime some arrays, to make sure their order matches hello_android_apk
-  dex.addStr"<init>"
-  dex.addStr"I"
-  dex.addStr"Landroid/app/Activity;"
-  dex.addStr"Landroid/os/Bundle;"
-  dex.addStr"Lcom/android/hello/HelloAndroid;"
-  dex.addStr"V"
-  dex.addStr"VI"
-  dex.addStr"VL"
-  dex.addStr"onCreate"
-  dex.addStr"setContentView"
+  dex.addStr "<init>"
+  dex.addStr "I"
+  dex.addStr Activity
+  dex.addStr Bundle
+  dex.addStr HelloAndroid
+  dex.addStr "V"
+  dex.addStr "VI"
+  dex.addStr "VL"
+  dex.addStr "onCreate"
+  dex.addStr "setContentView"
   dex.addTypeList(@["I"])
 
-  dex.classes.add(ClassDef(
-    class: "Lcom/android/hello/HelloAndroid;",
-    access: {Public},
-    superclass: SomeType("Landroid/app/Activity;"),
-    class_data: ClassData(
-      direct_methods: @[
-        EncodedMethod(
-          m: jproto HelloAndroid.`<init>`(),
-          access: {Public, Constructor},
-          code: SomeCode(Code(
-            registers: 1,
-            ins: 1,
-            outs: 1,
-            instrs: @[
-              invoke_direct(0, jproto Activity.`<init>`()),
-              return_void(),
-            ],
-          )),
-        ),
-      ],
-      virtual_methods: @[
-        EncodedMethod(
-          m: jproto HelloAndroid.onCreate(Bundle),
-          access: {Public},
-          code: SomeCode(Code(
-            registers: 3,
-            ins: 2,
-            outs: 2,
-            instrs: @[
-              invoke_super(1, 2, jproto Activity.onCreate(Bundle)),
-              const_high16(0, 0x7f03),
-              invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int)),
-              return_void(),
-            ],
-          )),
-        ),
-      ],
-    )
-  ))
+  dex.classes.add:
+    jclass com.android.hello.HelloAndroid {.public.} of Activity:
+      proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
+        invoke_direct(0, jproto Activity.`<init>`())
+        return_void()
+      proc onCreate(Bundle) {.public, regs:3, ins:2, outs:2.} =
+        invoke_super(1, 2, jproto Activity.onCreate(Bundle))
+        const_high16(0, 0x7f03)
+        invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int))
+        return_void()
+
   check dex.render.dumpHex == hello_android_apk.dumpHex
 
 proc tweak_prefix(s, prefix: string): string =
