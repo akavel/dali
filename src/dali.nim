@@ -619,6 +619,16 @@ proc typeLetter(fullType: string): string =
   of "double": "D"
   else: ""
 
+proc handleJavaType(n: NimNode): NimNode =
+  ## handleJavaType checks if n is an identifer corresponding to a Java type name.
+  ## If yes, it returns a string literal with a one-letter code of this type. Otherwise,
+  ## it returns a copy of the original node n.
+  let coded = n.strVal.typeLetter
+  if coded != "":
+    result = newLit(coded)
+  else:
+    result = copyNimNode(n)
+
 macro jproto*(proto: untyped, ret: untyped = void): untyped =
   ## jproto is a macro converting a prototype declaration into a dali Method object.
   ## Example:
@@ -633,7 +643,7 @@ macro jproto*(proto: untyped, ret: untyped = void): untyped =
   ## TODO: support Java array types, i.e. int[], int[][], etc.
   # echo proto.treeRepr
   # echo ret.treeRepr
-  result = nnkStmtList.newTree()
+  # result = nnkStmtList.newTree()
   # echo "----------------"
 
   # Verify that proto + ret have correct syntax
@@ -660,22 +670,13 @@ macro jproto*(proto: untyped, ret: untyped = void): untyped =
   # Build parameters list
   var params: seq[NimNode]
   for i in 1..<proto.len:
-    let n = proto[i].strVal
-    let coded = typeLetter(n)
-    if coded != "":
-      params.add newLit(coded)
-    else:
-      params.add copyNimNode(proto[i])   # TODO: or can we just reuse proto[i] ?
+    params.add proto[i].handleJavaType
   let paramsTree = newTree(nnkBracket, params)
 
   # Build return type
   var rett: NimNode = newLit("V")
   if ret.kind == nnkStmtList:
-    let coded = ret[0].strVal.typeLetter
-    if coded != "":
-      rett = newLit(coded)
-    else:
-      rett = copyNimNode(ret[0])
+    rett = ret[0].handleJavaType
 
   # Build result
   let clazz = copyNimNode(proto[0][0])
