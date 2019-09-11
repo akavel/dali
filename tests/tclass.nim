@@ -47,7 +47,7 @@ macro jclass(header, body: untyped): untyped =
   echo body.treeRepr
   echo "----------"
 
-  # Parse header
+  # Parse class header (class name & various modifiers)
   var super = ident("Ljava/lang/Object;")  # by default, classes inherit from Object
   var rest = header
   # [jclass com.foo.Bar {.public.}] of Activity
@@ -86,7 +86,11 @@ macro jclass(header, body: untyped): untyped =
   reverse(classPath)
   # echo classPath.repr
 
-  # Parse body - a list of proc definitions
+  # Translate the class name to a string understood by Java bytecode. Do it
+  # here as it'll be needed below.
+  let classString = "L" & classPath.join(".") & ";"
+
+  # Parse class body - a list of proc definitions
   if body.kind != nnkStmtList:
     error "jclass expects a list of proc definitions", body
   for procDef in body:
@@ -111,7 +115,9 @@ macro jclass(header, body: untyped): untyped =
       for p in procDef[i_pragmas]:
         pragmas.add ident(p.strVal.capitalizeAscii)
     # proc return type
-    #...
+    var ret: NimNode = newLit("V")
+    if procDef[i_params][0].kind != nnkEmpty:
+      ret = procDef[i_params][0].handleJavaType
     # check & collect proc params
     var params: seq[NimNode]
     if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
@@ -123,6 +129,31 @@ macro jclass(header, body: untyped): untyped =
       if rawParams[n-2].kind != nnkEmpty: error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-2]
       for i in 0..<rawParams.len-2:
         params.add rawParams[i].handleJavaType
+    # check proc body
+    var pbody: seq[NimNode]
+    if procDef[i_body].kind notin {nnkEmpty, nnkStmtList}:
+      error "unexpected syntax of jclass proc body", procDef[i_body]
+    if procDef[i_body].kind == nnkStmtList:
+      for stmt in procDef[i_body]:
+        if stmt.kind != nnkCall:
+          error "jclass expects proc body to contain only Android assembly instructions", stmt
+        pbody.add stmt
+
+    # Rewrite the procedure as an EncodedMethod object
+    let
+      name = procDef[i_name].collectProcName
+      paramsTree = newTree(nnkBracket, params)
+      accessTree = newTree(nnkCurly, pragmas)
+    let enc = quote do:
+      EncodedMethod(
+        m: Method(
+          class: `classString`,
+          name: `name`,
+          prototype: Prototype(
+            ret: `ret`,
+            params: @ `paramsTree`)),
+        access: `accessTree`)
+    # echo enc.repr
 
   # error "TODO... NIY"
 

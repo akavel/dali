@@ -679,21 +679,24 @@ macro jproto*(proto: untyped, ret: untyped = void): untyped =
     rett = ret[0].handleJavaType
 
   # Build result
-  let clazz = copyNimNode(proto[0][0])
-  let name = if proto[0][1].kind == nnkIdent:
-      newLit(proto[0][1].strVal)
-    else:
-      var buf = ""
-      for it in proto[0][1].items:
-        buf.add it.strVal
-      newLit(buf)
+  let class = copyNimNode(proto[0][0])
+  let name = proto[0][1].collectProcName
   result = quote do:
     Method(
-      class: `clazz`,
+      class: `class`,
       name: `name`,
       prototype: Prototype(
         ret: `rett`,
         params: @ `paramsTree`))
   # echo "======"
   # echo result.repr
+
+proc collectProcName*(n: NimNode): NimNode =
+  if n.kind == nnkIdent:
+    newLit(n.strVal)
+  else:
+    var buf = ""
+    for it in n.items:
+      buf.add it.strVal
+    newLit(buf)
 
