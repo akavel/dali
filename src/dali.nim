@@ -630,6 +630,31 @@ proc adler32(s: string): uint32 =
     b = (b + a) mod MOD_ADLER
   result = (b shl 16) or a
 
+macro jtype*(spec: untyped): string = rawJType(spec, false)
+
+proc rawJType(spec: NimNode, dotted: bool): string =
+  case spec.kind
+  of nnkBracketExpr:
+    if spec.len != 1:
+      error "jtype expected brackets with nothing inside", spec
+    result = "[" & rawJType(spec[0], false)
+  of nnkDotExpr:
+    if spec.len != 2: error "unexpected syntax for jtype", spec
+    if spec[0].kind notin {nnkDotExpr, nnkIdent}: error "unexpected syntax for jtype", spec[0]
+    if spec[1].kind != nnkIdent: error "unexpected syntax for jtype", spec[1]
+    result = rawJType(spec[0], true) & "/" & spec[1].strVal
+    if not dotted:
+      result = "L" & result & ";"
+  of nnkIdent:
+    if dotted:
+      result = spec.strVal
+    else:
+      result = spec.strVal.typeLetter
+      if result == "":
+        result = "L" & spec.strVal & ";"
+  else:
+    error "unexpected syntax for jtype", spec
+
 proc typeLetter(fullType: string): string =
   ## typeLetter returns a one-letter code of a Java/Android primitive type,
   ## as represented in bytecode. Returns empty string if the input type is not known.
