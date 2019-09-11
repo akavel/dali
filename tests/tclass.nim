@@ -27,8 +27,8 @@ let
 
 discard jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
-    invoke_direct(0, jproto Application.`<init>`())
-    return_void()
+    invoke_direct 0, jproto Application.`<init>`()
+    return_void
 
 discard jclass com.android.hello.HelloAndroid {.public.} of Activity:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =

@@ -845,9 +845,18 @@ macro jclass*(header, body: untyped): untyped =
       error "unexpected syntax of jclass proc body", procDef[i_body]
     if procDef[i_body].kind == nnkStmtList:
       for stmt in procDef[i_body]:
-        if stmt.kind != nnkCall:
+        case stmt.kind
+        of nnkCall:
+          pbody.add stmt
+        of nnkCommand:
+          var call = newTree(nnkCall)
+          stmt.copyChildrenTo(call)
+          call.copyLineInfo(stmt)
+          pbody.add call
+        of nnkIdent:
+          pbody.add newCall(stmt)
+        else:
           error "jclass expects proc body to contain only Android assembly instructions", stmt
-        pbody.add stmt
 
     # Rewrite the procedure as an EncodedMethod object
     let
