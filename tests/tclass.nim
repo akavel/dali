@@ -121,12 +121,26 @@ macro jclass(header, body: untyped): untyped =
     var
       procPragmas: seq[NimNode]
       isDirect = false
+      procRegs = 0
+      procIns = 0
+      procOuts = 0
     if procDef[i_pragmas].kind == nnkPragma:
       for p in procDef[i_pragmas]:
-        let capitalized = p.strVal.capitalizeAscii
-        procPragmas.add ident(capitalized)
-        if capitalized in directMethodPragmas:
-          isDirect = true
+        if p.kind notin {nnkIdent, nnkExprColonExpr}:
+          error "unexpected format of pragma in jclass proc", p
+        if p.kind == nnkIdent:
+          let capitalized = p.strVal.capitalizeAscii
+          procPragmas.add ident(capitalized)
+          if capitalized in directMethodPragmas:
+            isDirect = true
+        else:
+          if p[0].kind != nnkIdent: error "unexpected format of pragma in jclass proc", p[0]
+          if p[1].kind != nnkIntLit: error "unexpected format of pragma in jclass proc", p[1]
+          case p[0].strVal
+          of "regs": procRegs = p[1].intVal.int
+          of "ins":  procIns = p[1].intVal.int
+          of "outs": procOuts = p[1].intVal.int
+          else: error "expected one of: 'regs: N', 'ins: N', 'outs: N' or access pragmas", p[0]
     # proc return type
     var ret: NimNode = newLit("V")
     if procDef[i_params][0].kind != nnkEmpty:
@@ -157,11 +171,18 @@ macro jclass(header, body: untyped): untyped =
       name = procDef[i_name].collectProcName
       paramsTree = newTree(nnkBracket, params)
       procAccessTree = newTree(nnkCurly, procPragmas)
+      regsTree = newLit(procRegs)
+      insTree = newLit(procIns)
+      outsTree = newLit(procOuts)
       codeTree =
         if pbody.len > 0:
           let instrs = newTree(nnkBracket, pbody)
           quote do:
-            SomeCode(Code(instrs: @`instrs`))
+            SomeCode(Code(
+              registers: `regsTree`,
+              ins: `insTree`,
+              outs: `outsTree`,
+              instrs: @`instrs`))
         else:
           quote do:
             NoCode()
@@ -208,22 +229,25 @@ macro jclass(header, body: untyped): untyped =
   # error "TODO... NIY"
 
 # dumpTree SomeCode(Code(registers: 3))
+# dumpTree:
+#   proc foo() {.public, bar: 1, baz: 2.} =
+#     discard
 
 jclass hw {.public.}
 
 jclass com.foo.Bar  # no pragmas
 
 jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
-  proc `<init>`() {.public, final, constructor.} =
+  proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
     invoke_direct(0, jproto Application.`<init>`())
     return_void()
 
 jclass com.android.hello.HelloAndroid {.public.} of Activity:
-  proc `<init>`() {.public, final, constructor.} =
+  proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
     invoke_direct(0, jproto Activity.`<init>`())
     return_void()
   proc fooBar(Bundle, View, int)
-  proc onCreate(Bundle) {.public.} =
+  proc onCreate(Bundle) {.public, regs:3, ins:2, outs:2.} =
     invoke_super(1, 2, jproto Activity.onCreate(Bundle))
     const_high16(0, 0x7f03)
     invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int))
