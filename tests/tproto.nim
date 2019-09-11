@@ -53,3 +53,16 @@ test "constructor":
     class: HelloActivity,
     name: "<init>",
     prototype: Prototype(ret: "V", params: @[]))
+
+test "array types":
+  let p = jproto HelloActivity.foo(int[], float[][]) -> String[][]
+  checkpoint p.repr
+  check p.equals Method(
+    class: HelloActivity,
+    name: "foo",
+    prototype: Prototype(
+      ret: "[[Ljava/lang/String;",
+      params: @[ "[I", "[[F" ],
+    )
+  )
+

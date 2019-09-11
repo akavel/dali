@@ -149,8 +149,9 @@ test "synthesized hello_world.apk":
 test "synthesized hello_world.apk prettified with macros":
   let
     dex = newDex()
-    PrintStream = "Ljava/io/PrintStream;"
-    String = "Ljava/lang/String;"
+    PrintStream = jtype java.io.PrintStream
+    String = jtype java.lang.String
+    hw = jtype hw
   dex.classes.add(ClassDef(
     class: "Lhw;",
     access: {Public},
@@ -158,13 +159,7 @@ test "synthesized hello_world.apk prettified with macros":
     class_data: ClassData(
       direct_methods: @[
         EncodedMethod(
-          m: Method(
-            class: "Lhw;",
-            name: "main",
-            prototype: Prototype(
-              ret: "V",
-              params: @["[Ljava/lang/String;"]),
-          ),
+          m: jproto hw.main(String[]),
           access: {Public, Static},
           code: SomeCode(Code(
             registers: 2,

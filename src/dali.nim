@@ -673,11 +673,20 @@ proc handleJavaType(n: NimNode): NimNode =
   ## handleJavaType checks if n is an identifer corresponding to a Java type name.
   ## If yes, it returns a string literal with a one-letter code of this type. Otherwise,
   ## it returns a copy of the original node n.
-  let coded = n.strVal.typeLetter
-  if coded != "":
-    result = newLit(coded)
+  ## Any `[]` at the end are converted to `"[" &` prefix expression on the result.
+  case n.kind
+  of nnkIdent:
+    let coded = n.strVal.typeLetter
+    if coded != "":
+      result = newLit(coded)
+    else:
+      result = copyNimNode(n)
+  of nnkBracketExpr:
+    if n.len != 1:
+      error "only empty [] allowed in Java types", n
+    result = infix(newLit("["), "&", n[0].handleJavaType)
   else:
-    result = copyNimNode(n)
+    error "don't know how to parse as Java type", n
 
 macro jproto*(prototype: untyped): untyped =
   ## jproto is a macro converting a prototype declaration into a dali Method object.
@@ -685,16 +694,10 @@ macro jproto*(prototype: untyped): untyped =
   ##
   ##   let HelloWorld = "Lcom/hello/HelloWorld;"
   ##   let String = "Ljava/lang/String;"
-  ##   jproc HelloWorld.hello(String, int): String
+  ##   jproc HelloWorld.hello(String, int[]) -> String[][]
   ##   jproc HelloWorld.`<init>`()
-  ##   # NOTE: jproc argument must not be parenthesized; the following does not work unfortunately:
-  ##   # jproc(HelloWorld.hello(String, int): String)
   ##
-  ## TODO: support Java array types, i.e. int[], int[][], etc.
   # echo proto.treeRepr
-  # echo ret.treeRepr
-  # result = nnkStmtList.newTree()
-  # echo "----------------"
   var proto = prototype
 
   # Parse & verify that proto has correct syntax
@@ -702,8 +705,7 @@ macro jproto*(prototype: untyped): untyped =
   var rett = newLit("V")
   if proto.kind == nnkInfix and
     proto[0].kind == nnkIdent and
-    proto[0].strVal == "->" and
-    proto[2].kind == nnkIdent:
+    proto[0].strVal == "->":
     rett = proto[2].handleJavaType
     proto = proto[1]
   # ...class & method name:
@@ -717,10 +719,6 @@ macro jproto*(prototype: untyped): untyped =
     proto[0][0].kind != nnkIdent or
     proto[0][1].kind notin {nnkIdent, nnkAccQuoted}:
     error "jproto expects exactly 2 dot-separated names in the argument", proto[0]
-  # ... parameters list:
-  for i in 1..<proto.len:
-    if proto[i].kind != nnkIdent:
-      error "jproto expects type names as method parameters", proto[i]
 
   # Build parameters list
   var params: seq[NimNode]
