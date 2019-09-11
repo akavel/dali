@@ -14,99 +14,42 @@ const
   Bundle = "Landroid/os/Bundle;"
   TextView = "Landroid/widget/TextView;"
   System = "Ljava/lang/System;"
+  String = "Ljava/lang/String;"
+  Context = "Landroid/content/Context;"
+  View = "Landroid/view/View;"
+  CharSequence = "Ljava/lang/CharSequence;"
 
 var dex = newDex()
-dex.classes.add(ClassDef(
-  class: HelloActivity,
-  access: {Public},
-  superclass: SomeType(Activity),
-  class_data: ClassData(
-    direct_methods: @[
-      EncodedMethod(
-        m: Method(
-          class: HelloActivity,
-          name: "<clinit>",
-          prototype: Prototype(ret: "V", params: @[]),
-        ),
-        access: {Static, Constructor},
-        code: SomeCode(Code(
-          registers: 2,
-          ins: 0,
-          outs: 1,
-          instrs: @[
-            # System.loadLibrary("hello-mello")
-            const_string(0, "hello-mello"),
-            invoke_static(0, Method(class: System, name: "loadLibrary",
-              prototype: Prototype(ret: "V", params: @["Ljava/lang/String;"]))),
-            return_void(),
-          ],
-        )),
-      ),
-      EncodedMethod(
-        m: Method(
-          class: HelloActivity,
-          name: "<init>",
-          prototype: Prototype(ret: "V", params: @[]),
-        ),
-        access: {Public, Constructor},
-        code: SomeCode(Code(
-          registers: 1,
-          ins: 1,
-          outs: 1,
-          instrs: @[
-            invoke_direct(0, Method(class: Activity, name: "<init>",
-              prototype: Prototype(ret: "V", params: @[]))),
-            return_void(),
-          ],
-        )),
-      ),
-    ],
-    virtual_methods: @[
-      EncodedMethod(
-        m: Method(
-          class: HelloActivity,
-          name: "onCreate",
-          prototype: Prototype(ret: "V", params: @[Bundle])),
-        access: {Public},
-        code: SomeCode(Code(
-          registers: 4,
-          ins: 2,   # this, arg0
-          outs: 2,  # TODO(akavel): what does this really mean???
-          instrs: @[
-            # super.onCreate(arg0)
-            invoke_super(2, 3, Method(class: Activity, name: "onCreate",
-              prototype: Prototype(ret: "V", params: @[Bundle]))),
-            # v0 = new TextView(this)
-            new_instance(0, TextView),
-            invoke_direct(0, 2, Method(class: TextView, name: "<init>",
-              prototype: Prototype(ret: "V", params: @["Landroid/content/Context;"]))),
-            # v1 = this.stringFromJNI()
-            #  NOTE: failure to call a Native function should result in
-            #  java.lang.UnsatisfiedLinkError exception
-            invoke_virtual(2, Method(class: HelloActivity, name: "stringFromJNI",
-              prototype: Prototype(ret: "Ljava/lang/String;", params: @[]))),
-            move_result_object(1),
-            # v0.setText(v1)
-            invoke_virtual(0, 1, Method(class: TextView, name: "setText",
-              prototype: Prototype(ret: "V", params: @["Ljava/lang/CharSequence;"]))),
-            # this.setContentView(v0)
-            invoke_virtual(2, 0, Method(class: HelloActivity, name: "setContentView",
-              prototype: Prototype(ret: "V", params: @["Landroid/view/View;"]))),
-            # return
-            return_void(),
-          ],
-        )),
-      ),
-      EncodedMethod(
-        m: Method(
-          class: HelloActivity,
-          name: "stringFromJNI",
-          prototype: Prototype(ret: "Ljava/lang/String;", params: @[])),
-        access: {Public, Native},
-        code: NoCode(),
-      ),
-    ]
-  )
-))
+
+dex.classes.add:
+  jclass com.akavel.hello2.HelloActivity {.public.} of Activity:
+    proc `<clinit>`() {.static, constructor, regs:2, ins:0, outs:1.} =
+      # System.loadLibrary("hello-mello")
+      const_string(0, "hello-mello")
+      invoke_static(0, jproto System.loadLibrary(String))
+      return_void()
+    proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
+      invoke_direct(0, jproto Activity.`<init>`())
+      return_void()
+    proc onCreate(Bundle) {.public, regs:4, ins:2, outs:2.} =
+      # ins: this, arg0
+      # super.onCreate(arg0)
+      invoke_super(2, 3, jproto Activity.onCreate(Bundle))
+      # v0 = new TextView(this)
+      new_instance(0, TextView)
+      invoke_direct(0, 2, jproto TextView.`<init>`(Context))
+      # v1 = this.stringFromJNI()
+      #  NOTE: failure to call a Native function should result in
+      #  java.lang.UnsatisfiedLinkError exception
+      invoke_virtual(2, jproto HelloActivity.stringFromJNI() -> String)
+      move_result_object(1)
+      # v0.setText(v1)
+      invoke_virtual(0, 1, jproto TextView.setText(CharSequence))
+      # this.setContentView(v0)
+      invoke_virtual(2, 0, jproto HelloActivity.setContentView(View))
+      # return
+      return_void()
+    proc stringFromJNI(): String {.public, native.}
+
 stdout.write(dex.render)
 
