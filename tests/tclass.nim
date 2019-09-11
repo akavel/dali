@@ -2,6 +2,7 @@ import unittest
 import macros
 import algorithm
 import strutils
+import sets
 import dali
 
 let
@@ -35,6 +36,10 @@ proc handleJavaType(n: NimNode): NimNode =
     result = copyNimNode(n)
 
 
+let
+  # TODO: shouldn't below also contain Final???
+  directMethodPragmas = toSet(["Static", "Private", "Constructor"])
+
 macro jclass(header: untyped): untyped =
   ## TODO
   result = nnkStmtList.newTree()
@@ -43,12 +48,12 @@ macro jclass(header: untyped): untyped =
 
 macro jclass(header, body: untyped): untyped =
   result = nnkStmtList.newTree()
-  echo header.treeRepr
-  echo body.treeRepr
+  # echo header.treeRepr
+  # echo body.treeRepr
   echo "----------"
 
   # Parse class header (class name & various modifiers)
-  var super = ident("Ljava/lang/Object;")  # by default, classes inherit from Object
+  var super = newEmptyNode()
   var rest = header
   # [jclass com.foo.Bar {.public.}] of Activity
   if header.kind == nnkInfix and
@@ -57,7 +62,7 @@ macro jclass(header, body: untyped): untyped =
     super = header[2]  # TODO: copyNimNode ?
     rest = header[1]
   # [jclass com.foo.Bar] {.public.}
-  var pragmas: seq[string]
+  var pragmas: seq[NimNode]
   if rest.kind == nnkPragmaExpr:
     if rest.len != 2:
       error "jclass encountered unexpected syntax (too many words)", rest
@@ -66,7 +71,7 @@ macro jclass(header, body: untyped): untyped =
     for p in rest[1]:
       if p.kind != nnkIdent:
         error "jclass expects a simple pragma identifer", p
-      pragmas.add p.strVal
+      pragmas.add ident(p.strVal.capitalizeAscii)
     rest = rest[0]
   # [jclass] com.foo.[Bar]
   var classPath: seq[string]
@@ -93,6 +98,9 @@ macro jclass(header, body: untyped): untyped =
   # Parse class body - a list of proc definitions
   if body.kind != nnkStmtList:
     error "jclass expects a list of proc definitions", body
+  var
+    directMethods: seq[NimNode]
+    virtualMethods: seq[NimNode]
   for procDef in body:
     if procDef.kind != nnkProcDef:
       error "jclass expects a list of proc definitions", procDef
@@ -110,10 +118,15 @@ macro jclass(header, body: untyped): untyped =
     if procDef[1].kind != nnkEmpty: error "unexpected term rewriting pattern in jclass proc", procDef[1]
     if procDef[2].kind != nnkEmpty: error "unexpected generic type param in jclass proc", procDef[2]
     # proc pragmas
-    var pragmas: seq[NimNode]
+    var
+      procPragmas: seq[NimNode]
+      isDirect = false
     if procDef[i_pragmas].kind == nnkPragma:
       for p in procDef[i_pragmas]:
-        pragmas.add ident(p.strVal.capitalizeAscii)
+        let capitalized = p.strVal.capitalizeAscii
+        procPragmas.add ident(capitalized)
+        if capitalized in directMethodPragmas:
+          isDirect = true
     # proc return type
     var ret: NimNode = newLit("V")
     if procDef[i_params][0].kind != nnkEmpty:
@@ -143,7 +156,15 @@ macro jclass(header, body: untyped): untyped =
     let
       name = procDef[i_name].collectProcName
       paramsTree = newTree(nnkBracket, params)
-      accessTree = newTree(nnkCurly, pragmas)
+      procAccessTree = newTree(nnkCurly, procPragmas)
+      codeTree =
+        if pbody.len > 0:
+          let instrs = newTree(nnkBracket, pbody)
+          quote do:
+            SomeCode(Code(instrs: @`instrs`))
+        else:
+          quote do:
+            NoCode()
     let enc = quote do:
       EncodedMethod(
         m: Method(
@@ -152,10 +173,41 @@ macro jclass(header, body: untyped): untyped =
           prototype: Prototype(
             ret: `ret`,
             params: @ `paramsTree`)),
-        access: `accessTree`)
-    # echo enc.repr
+        access: `procAccessTree`,
+        code: `codeTree`)
+    # echo enc.repr  # this prints Nim code - Thanks @disruptek on Nim chatroom for the hint!
+    # echo enc.treeRepr
+    if isDirect:
+      directMethods.add enc
+    else:
+      virtualMethods.add enc
+
+  # Render collected data into a ClassDef object
+  let
+    classTree = newLit(classString)
+    accessTree = newTree(nnkCurly, pragmas)
+    superclassTree =
+      if super.kind == nnkEmpty:
+        quote do:
+          NoType()
+      else:
+        quote do:
+          SomeType(`super`)
+    directMethodsTree = newTree(nnkBracket, directMethods)
+    virtualMethodsTree = newTree(nnkBracket, virtualMethods)
+  let classDef = quote do:
+    ClassDef(
+      class: `classTree`,
+      access: `accessTree`,
+      superclass: `superclassTree`,
+      class_data: ClassData(
+        direct_methods: @`directMethodsTree`,
+        virtual_methods: @`virtualMethodsTree`))
+  echo classDef.repr
 
   # error "TODO... NIY"
+
+# dumpTree SomeCode(Code(registers: 3))
 
 jclass hw {.public.}
 
