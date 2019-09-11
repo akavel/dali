@@ -654,7 +654,7 @@ proc handleJavaType(n: NimNode): NimNode =
   else:
     result = copyNimNode(n)
 
-macro jproto*(proto: untyped, ret: untyped = void): untyped =
+macro jproto*(prototype: untyped): untyped =
   ## jproto is a macro converting a prototype declaration into a dali Method object.
   ## Example:
   ##
@@ -670,8 +670,17 @@ macro jproto*(proto: untyped, ret: untyped = void): untyped =
   # echo ret.treeRepr
   # result = nnkStmtList.newTree()
   # echo "----------------"
+  var proto = prototype
 
-  # Verify that proto + ret have correct syntax
+  # Parse & verify that proto has correct syntax
+  # ...return type if present
+  var rett = newLit("V")
+  if proto.kind == nnkInfix and
+    proto[0].kind == nnkIdent and
+    proto[0].strVal == "->" and
+    proto[2].kind == nnkIdent:
+    rett = proto[2].handleJavaType
+    proto = proto[1]
   # ...class & method name:
   if proto.kind != nnkCall:
     error "jproto expects a method declaration as an argument", proto
@@ -687,21 +696,12 @@ macro jproto*(proto: untyped, ret: untyped = void): untyped =
   for i in 1..<proto.len:
     if proto[i].kind != nnkIdent:
       error "jproto expects type names as method parameters", proto[i]
-  # ... optional return type:
-  if (ret.kind != nnkStmtList or ret.len != 1 or ret[0].kind != nnkIdent) and
-    (ret.kind != nnkSym or ret.strVal != "void"):
-    error "jproto expects an optional type name after the parameters list", ret
 
   # Build parameters list
   var params: seq[NimNode]
   for i in 1..<proto.len:
     params.add proto[i].handleJavaType
   let paramsTree = newTree(nnkBracket, params)
-
-  # Build return type
-  var rett: NimNode = newLit("V")
-  if ret.kind == nnkStmtList:
-    rett = ret[0].handleJavaType
 
   # Build result
   let class = copyNimNode(proto[0][0])

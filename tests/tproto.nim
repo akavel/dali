@@ -17,20 +17,21 @@ let
   zzz = "Lfoo/bar/Zzz;"
   View = "Landroid/view/View;"
   h1 = jproto hello.world()
-  h2 = jproto hello.world(z, zz, int): zzz
+  h2 = jproto hello.world(z, zz, int) -> zzz
   # jproto hello.world(z, zz, int): zzz[int, float]
   h4 = jproto hello.`<init>`()
+  h5 = jproto hello.world() -> zzz
   # jproto hello.<init>()
-  # jproto hello.world(z: y): zzz[int, float]
-  # jproto hello.world(z: y, one: two): zzz[int, float]
-  # jproto(hello.world(z: y): zzz)
+  # jproto hello.world(z: y) -> zzz[int, float]
+  # jproto hello.world(z: y, one: two) -> zzz[int, float]
+  # jproto(hello.world(z: y) -> zzz)
 
 let
   HelloActivity = "Lfoo/HelloActivity;"
   String = "Ljava/lang/String;"
 
 test "long prototype syntax":
-  let p = jproto HelloActivity.setContentView(View, int): String
+  let p = jproto HelloActivity.setContentView(View, int) -> String
   checkpoint p.repr
   check p.equals Method(
     class: HelloActivity,
