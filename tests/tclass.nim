@@ -9,6 +9,9 @@ let
   Object = "Ljava/lang/Object;"
   Application = "Landroid/app/Application;"
   Activity = "Landroid/app/Activity;"
+  Bundle = "Landroid/os/Bundle;"
+  View = "Landroid/view/View;"
+  HelloAndroid = "Lcom/android/hello/HelloAndroid;"
 
 
 proc typeLetter(fullType: string): string =
@@ -40,11 +43,11 @@ let
   # TODO: shouldn't below also contain Final???
   directMethodPragmas = toSet(["Static", "Private", "Constructor"])
 
-macro jclass(header: untyped): untyped =
-  ## TODO
-  result = nnkStmtList.newTree()
-  echo header.treeRepr
-  echo "----------"
+# macro jclass(header: untyped): untyped =
+#   ## TODO
+#   result = nnkStmtList.newTree()
+#   echo header.treeRepr
+#   echo "----------"
 
 macro jclass(header, body: untyped): untyped =
   result = nnkStmtList.newTree()
@@ -93,7 +96,7 @@ macro jclass(header, body: untyped): untyped =
 
   # Translate the class name to a string understood by Java bytecode. Do it
   # here as it'll be needed below.
-  let classString = "L" & classPath.join(".") & ";"
+  let classString = "L" & classPath.join("/") & ";"
 
   # Parse class body - a list of proc definitions
   if body.kind != nnkStmtList:
@@ -224,25 +227,26 @@ macro jclass(header, body: untyped): untyped =
       class_data: ClassData(
         direct_methods: @`directMethodsTree`,
         virtual_methods: @`virtualMethodsTree`))
-  echo classDef.repr
+  # echo classDef.repr
 
-  # error "TODO... NIY"
+  # TODO: also, create a `let` identifer for the class name
+  result = classDef
 
 # dumpTree SomeCode(Code(registers: 3))
 # dumpTree:
 #   proc foo() {.public, bar: 1, baz: 2.} =
 #     discard
 
-jclass hw {.public.}
+# discard jclass hw {.public.}
 
-jclass com.foo.Bar  # no pragmas
+# discard jclass com.foo.Bar  # no pragmas
 
-jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
+discard jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
     invoke_direct(0, jproto Application.`<init>`())
     return_void()
 
-jclass com.android.hello.HelloAndroid {.public.} of Activity:
+discard jclass com.android.hello.HelloAndroid {.public.} of Activity:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
     invoke_direct(0, jproto Activity.`<init>`())
     return_void()
@@ -252,4 +256,44 @@ jclass com.android.hello.HelloAndroid {.public.} of Activity:
     const_high16(0, 0x7f03)
     invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int))
     return_void()
+
+# TODO: test "hello_world.apk":
+
+test "bugsnag.apk":
+  let c =
+    jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
+      proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
+        invoke_direct(0, jproto Application.`<init>`())
+        return_void()
+  checkpoint c.repr
+  check c.equals ClassDef(
+    class: "Lcom/bugsnag/dexexample/BugsnagApp;",
+    access: {Public}, # TODO
+    superclass: SomeType("Landroid/app/Application;"),
+    class_data: ClassData(
+      direct_methods: @[
+        EncodedMethod(
+          m: Method(
+            class: "Lcom/bugsnag/dexexample/BugsnagApp;",
+            name: "<init>",
+            prototype: Prototype(
+              ret: "V",
+              params: @[],
+            ),
+          ),
+          access: {Public, Constructor},
+          code: SomeCode(Code(
+            registers: 1,
+            ins: 1,
+            outs: 1,
+            instrs: @[
+              invoke_direct(0, Method(class: "Landroid/app/Application;", name: "<init>",
+                prototype: Prototype(ret: "V", params: @[]))),
+              return_void(),
+            ],
+          )),
+        )
+      ]
+    )
+  )
 
