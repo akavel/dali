@@ -145,6 +145,9 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
       procRegs = 0
       procIns = 0
       procOuts = 0
+    let
+      # TODO: shouldn't below also contain Final???
+      directMethodPragmas = toSet(["Static", "Private", "Constructor"])
     if procDef[i_pragmas].kind == nnkPragma:
       for p in procDef[i_pragmas]:
         if p.kind notin {nnkIdent, nnkExprColonExpr}:
@@ -267,10 +270,6 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
     class: classDef,
     natProcs: nativeMethods)
 
-let
-  # TODO: shouldn't below also contain Final???
-  directMethodPragmas = toSet(["Static", "Private", "Constructor"])
-
 proc typeLetter(fullType: string): string =
   ## typeLetter returns a one-letter code of a Java/Android primitive type,
   ## as represented in bytecode. Returns empty string if the input type is not known.
@@ -304,12 +303,15 @@ proc handleNativeMethod(classPath: seq[string], procDef: NimNode): NimNode =
     i_body = 6
   # TODO: handle '$' in class names
   let
-    procName = "Java_" & classPath.join("_") & "_" & procDef[i_name].strVal
+    procName = ident("Java_" & classPath.join("_") & "_" & procDef[i_name].strVal)
     bodyTree = procDef[i_body]
     # Below procTree is not complete yet, but it's a good starting point.
     procTree = quote do:
       proc `procName`*(jenv: JNIEnvPtr, jthis: jobject) {.cdecl,exportc,dynlib.} =
         `bodyTree`
+  # Remove `gensym tag from parameters
+  procTree[i_params][1][0] = ident("jenv")
+  procTree[i_params][2][0] = ident("jthis")
   # Transplant the proc's returned type
   procTree[i_params][0] = procDef[i_params][0]
   # Append original proc's parameters to the procTree
@@ -357,5 +359,5 @@ classes_dex:
       # return
       return_void()
     proc stringFromJNI(): String {.public, native.} =
-      return jenv.NewStringUTF(env, "Hello from Nim aclass :D")
+      return jenv.NewStringUTF(jenv, "Hello from Nim aclass :D")
 
