@@ -59,7 +59,7 @@ macro classes_dex*(body: untyped): untyped =
           `dex`.classes.add(`c`))
       tree
   result = quote do:
-    when os != "android":
+    when not defined android:
       let `dex` = `newDex`()
       `classesTree`
       `stdout`.`write`(`dex`.`render`)
@@ -325,10 +325,15 @@ proc handleNativeMethod(classPath: seq[string], procDef: NimNode): NimNode =
 #   Bundle = jtype android.os.Bundle
 #   String = jtype java.lang.String
 let
-  HelloActivity = "Lcom/akavel/hello2/HelloActivity;"
   Activity = "Landroid/app/Activity;"
+  HelloActivity = "Lcom/akavel/hello2/HelloActivity;"
   Bundle = "Landroid/os/Bundle;"
+  TextView = "Landroid/widget/TextView;"
+  System = "Ljava/lang/System;"
   String = "Ljava/lang/String;"
+  Context = "Landroid/content/Context;"
+  View = "Landroid/view/View;"
+  CharSequence = "Ljava/lang/CharSequence;"
 
 classes_dex:
   aclass com.akavel.hello2.HelloActivity {.public.} of Activity:
