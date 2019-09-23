@@ -17,9 +17,11 @@ let
 #   echo "----------"
 
 # dumpTree SomeCode(Code(registers: 3))
-# dumpTree:
-#   proc foo() {.public, bar: 1, baz: 2.} =
-#     discard
+dumpTree:
+  # proc foo(int[], String[][]): String[][] {.public, bar: 1, baz: 2.} =
+  proc foo(x: int[], y: String[][]): String[][] {.public, bar: 1, baz: 2.} =
+    discard
+  proc bar(int)
 
 # discard jclass hw {.public.}
 
