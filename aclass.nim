@@ -1,6 +1,9 @@
 {.experimental: "codeReordering".}
 import macros
-import dali
+import strutils
+import algorithm
+import sets
+import src / dali
 import jni_wrapper
 
 # Goal sketch:
@@ -49,6 +52,12 @@ macro classes_dex*(body: untyped): untyped =
     write = bindSym"write"
     render = bindSym"render"
     nativeProcsTree = newTree(nnkStmtList, nativeProcs)
+    classesTree = block:
+      var tree = newTree(nnkStmtList)
+      for c in classes:
+        tree.add (quote do:
+          `dex`.classes.add(`c`))
+      tree
   result = quote do:
     when os != "android":
       let `dex` = `newDex`()
@@ -58,7 +67,6 @@ macro classes_dex*(body: untyped): untyped =
       `nativeProcsTree`
 
 proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[NimNode]] =
-  result = nnkStmtList.newTree()
   # echo header.treeRepr
   # echo body.treeRepr
   # echo "----------"
@@ -146,7 +154,7 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
           procPragmas.add ident(capitalized)
           if capitalized in directMethodPragmas:
             isDirect = true
-          else if capitalized == "Native":
+          elif capitalized == "Native":
             isNative = true
         else:
           if p[0].kind != nnkIdent: error "unexpected format of pragma in aclass proc", p[0]
@@ -192,6 +200,7 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
             pbody.add newCall(stmt)
           else:
             error "aclass expects proc body to contain only Android assembly instructions", stmt
+    echo nativeMethods.repr
 
     # Rewrite the procedure as an EncodedMethod object
     let
@@ -258,7 +267,35 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
     class: classDef,
     natProcs: nativeMethods)
 
-proc handleNativeMethod(classPath: seq[string], procDef: NimNode) =
+let
+  # TODO: shouldn't below also contain Final???
+  directMethodPragmas = toSet(["Static", "Private", "Constructor"])
+
+proc typeLetter(fullType: string): string =
+  ## typeLetter returns a one-letter code of a Java/Android primitive type,
+  ## as represented in bytecode. Returns empty string if the input type is not known.
+  case fullType
+  of "void": "V"
+  of "boolean": "Z"
+  of "byte": "B"
+  of "char": "C"
+  of "int": "I"
+  of "long": "J"
+  of "float": "F"
+  of "double": "D"
+  else: ""
+
+proc handleJavaType(n: NimNode): NimNode =
+  ## handleJavaType checks if n is an identifer corresponding to a Java type name.
+  ## If yes, it returns a string literal with a one-letter code of this type. Otherwise,
+  ## it returns a copy of the original node n.
+  let coded = n.strVal.typeLetter
+  if coded != "":
+    result = newLit(coded)
+  else:
+    result = copyNimNode(n)
+
+proc handleNativeMethod(classPath: seq[string], procDef: NimNode): NimNode =
   const
     # important indexes in nnkProcDef children,
     # see: https://nim-lang.org/docs/macros.html#statements-procedure-declaration
@@ -266,13 +303,30 @@ proc handleNativeMethod(classPath: seq[string], procDef: NimNode) =
     i_params = 3
     i_body = 6
   # TODO: handle '$' in class names
-  let procName = "Java_" & classPath.join("_") & "_" & procDef[i_name]
+  let
+    procName = "Java_" & classPath.join("_") & "_" & procDef[i_name].strVal
+    bodyTree = procDef[i_body]
+    # Below procTree is not complete yet, but it's a good starting point.
+    procTree = quote do:
+      proc `procName`*(jenv: JNIEnvPtr, jthis: jobject) {.cdecl,exportc,dynlib.} =
+        `bodyTree`
+  # Transplant the proc's returned type
+  procTree[i_params][0] = procDef[i_params][0]
+  # Append original proc's parameters to the procTree
+  for i in 1..<procDef[i_params].len:
+    procTree[i_params].add procDef[i_params][i]
+  return procTree
 
+# let
+#   HelloActivity = jtype com.akavel.hello2.HelloActivity
+#   Activity = jtype android.app.Activity
+#   Bundle = jtype android.os.Bundle
+#   String = jtype java.lang.String
 let
-  HelloActivity = jtype com.akavel.hello2.HelloActivity
-  Activity = jtype android.app.Activity
-  Bundle = jtype android.os.Bundle
-  String = jtype java.lang.String
+  HelloActivity = "Lcom/akavel/hello2/HelloActivity;"
+  Activity = "Landroid/app/Activity;"
+  Bundle = "Landroid/os/Bundle;"
+  String = "Ljava/lang/String;"
 
 classes_dex:
   aclass com.akavel.hello2.HelloActivity {.public.} of Activity:
