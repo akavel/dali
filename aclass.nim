@@ -275,13 +275,14 @@ proc typeLetter(fullType: string): string =
   ## as represented in bytecode. Returns empty string if the input type is not known.
   case fullType
   of "void": "V"
-  of "boolean": "Z"
-  of "byte": "B"
-  of "char": "C"
-  of "int": "I"
-  of "long": "J"
-  of "float": "F"
-  of "double": "D"
+  of "jboolean": "Z"
+  of "jbyte": "B"
+  of "jchar": "C"
+  of "jint": "I"
+  of "jlong": "J"
+  of "jfloat": "F"
+  of "jdouble": "D"
+  of "jshort": "S"
   else: ""
 
 proc handleJavaType(n: NimNode): NimNode =
@@ -290,9 +291,14 @@ proc handleJavaType(n: NimNode): NimNode =
   ## it returns a copy of the original node n.
   let coded = n.strVal.typeLetter
   if coded != "":
-    result = newLit(coded)
+    return newLit(coded)
+  case n.strVal
+  of "jstring": return newLit("Ljava/lang/String;")
+  of "jobject": return newLit("Ljava/lang/Object;")
+  of "JClass": return newLit("Ljava/lang/Class;")
+  of "jthrowable": return newLit("Ljava/lang/Throwable;")
   else:
-    result = copyNimNode(n)
+    return copyNimNode(n)
 
 proc handleNativeMethod(classPath: seq[string], procDef: NimNode): NimNode =
   const
@@ -363,6 +369,6 @@ classes_dex:
       invoke_virtual(2, 0, jproto HelloActivity.setContentView(View))
       # return
       return_void()
-    proc stringFromJNI(): String {.public, native.} =
+    proc stringFromJNI(): jstring {.public, native.} =
       return jenv.NewStringUTF(jenv, "Hello from Nim aclass :D")
 
