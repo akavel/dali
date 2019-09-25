@@ -11,15 +11,35 @@ type
   Slots32*[T] = distinct TSlots32[T]
   TSlots32[T] = Table[T, seq[Slot32]]
 
-proc reserve*(b: var Blob, n: int) {.inline.} =
+proc skip*(b: var Blob, n: int) {.inline.} =
   let pos = b.string.len
   b.string.setLen(pos + n)
   for i in pos ..< b.string.len:
     b.string[i] = chr(0)
 
+template `|>*`*(slot32: Slot32, slot: untyped): untyped =
+  let slot = slot32
+
+proc `|>`*(slot32: Slot32, slot: var Slot32) =
+  slot = slot32
+
+# macro slot*(b: var Blob, block: untyped) =
+#   let slot = gensym()
+#   result = quote do:
+#     let `slot` = b.slot32()
+#     `block`
+#   proc fill(n: NimNode) =
+#     for (i, c) in n:
+#       if c.kind == nnkIdent and c.strVal == "X32":
+#         n[i] = quote do:
+#           `slot`
+#       else:
+#         fill(n[i])
+#   fill(result)
+
 proc slot32*(b: var Blob): Slot32 {.inline.} =
   result = b.string.len.Slot32
-  b.reserve(4)
+  b.skip(4)
 
 proc set*(b: var Blob, slot: Slot32, v: uint32) =
   let i = slot.int
@@ -29,9 +49,12 @@ proc set*(b: var Blob, slot: Slot32, v: uint32) =
   b.string[i+2] = chr(v shr 16 and 0xff)
   b.string[i+3] = chr(v shr 24 and 0xff)
 
+proc `[]=`*(b: var Blob, slot: Slot32, v: uint32) =
+  b.set(slot, v)
+
 proc pad32*(b: var Blob) {.inline.} =
   let n = (4 - (b.string.len mod 4)) mod 4
-  b.reserve(n)
+  b.skip(n)
 
 proc puts*(b: var Blob, v: string) =
   if v.len == 0:
@@ -47,6 +70,9 @@ proc putc*(b: var Blob, v: char) {.inline.} =
 
 proc put32*(b: var Blob, v: uint32) =
   b.set(b.slot32, v)
+
+proc put32*(b: var Blob): Slot32 =
+  b.slot32()
 
 proc put16*(b: var Blob, v: uint16) =
   # Little-endian
