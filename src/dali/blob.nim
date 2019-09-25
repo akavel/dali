@@ -23,20 +23,6 @@ template `>>:`*(slot32: Slot32, slot: untyped): untyped =
 proc `>>`*(slot32: Slot32, slot: var Slot32) =
   slot = slot32
 
-# macro slot*(b: var Blob, block: untyped) =
-#   let slot = gensym()
-#   result = quote do:
-#     let `slot` = b.slot32()
-#     `block`
-#   proc fill(n: NimNode) =
-#     for (i, c) in n:
-#       if c.kind == nnkIdent and c.strVal == "X32":
-#         n[i] = quote do:
-#           `slot`
-#       else:
-#         fill(n[i])
-#   fill(result)
-
 proc slot32*(b: var Blob): Slot32 {.inline.} =
   result = b.string.len.Slot32
   b.skip(4)
@@ -114,9 +100,6 @@ proc put4*(b: var Blob, v: uint4, high: bool) =
 proc pos*(b: var Blob): uint32 {.inline.} =
   return b.string.len.uint32
 
-
-proc newSlots32*[T](): Slots32[T] {.inline.} =
-  return initTable[T, seq[Slot32]]().Slots32[:T]
 
 proc add*[T](slots: var Slots32[T], key: T, val: Slot32) =
   slots.TSlots32[:T].mgetOrPut(key, newSeq[Slot32]()).add(val)

@@ -187,16 +187,13 @@ func equals*(a, b: ClassDef): bool =
 
 proc newDex*(): Dex =
   new(result)
-  init(result.prototypes)
-  init(result.fields)
-  init(result.methods)
 
 proc render*(dex: Dex): string =
   dex.collect()
 
   # Storage for offsets where various sections of the file
   # start. Will be needed to render map_list.
-  var sectionOffsets = newSeq[tuple[typ: uint16, size: uint32, offset: uint32]]()
+  var sectionOffsets: seq[tuple[typ: uint16, size: uint32, offset: uint32]]
 
   # FIXME: ensure correct padding everywhere
   var blob = "".Blob
@@ -250,7 +247,7 @@ proc render*(dex: Dex): string =
   # segments inbetween.
   sectionOffsets.add((0x0003'u16, dex.prototypes.len.uint32, blob.pos))
   blob[protoIdsOffSlot] = blob.pos
-  var typeListOffsets = newSlots32[seq[Type]]()
+  var typeListOffsets: Slots32[seq[Type]]
   for p in dex.prototypes:
     blob.put32 stringIds[dex.strings[p.descriptor]].uint32
     blob.put32 dex.types.search(p.ret).uint32
@@ -277,7 +274,7 @@ proc render*(dex: Dex): string =
   #-- Partially render class defs.
   sectionOffsets.add((0x0006'u16, dex.classes.len.uint32, blob.pos))
   blob[classDefsOffSlot] = blob.pos
-  var classDataOffsets = newSlots32[Type]()
+  var classDataOffsets: Slots32[Type]
   const NO_INDEX = 0xffff_ffff'u32
   for c in dex.classes:
     blob.put32 dex.types.search(c.class).uint32
@@ -298,7 +295,7 @@ proc render*(dex: Dex): string =
   var codeItems = 0'u32
   blob[dataOffSlot] = blob.pos
   let dataStart = blob.pos
-  var codeOffsets = initTable[tuple[class: Type, name: string, proto: Prototype], uint32]()
+  var codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]
   for c in dex.classes:
     let cd = c.class_data
     for dm in cd.direct_methods & cd.virtual_methods:
@@ -538,13 +535,13 @@ proc addStr(dex: Dex, s: string) =
 
 proc stringsOrdering(dex: Dex): seq[int] =
   var i = 0
-  newSeq(result, dex.strings.len)
+  result.setLen dex.strings.len
   for s, added in dex.strings:
     result[added] = i
     inc i
 
 proc stringsAsAdded(dex: Dex): seq[string] =
-  newSeq(result, dex.strings.len)
+  result.setLen dex.strings.len
   for s, added in dex.strings:
     result[added] = s
 

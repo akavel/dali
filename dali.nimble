@@ -9,5 +9,5 @@ srcDir        = "src"
 
 # Dependencies
 
-requires "nim >= 0.19.4"
-requires "patty 0.3"
+requires "nim >= 1.0.0"
+requires "patty 0.3.3"
