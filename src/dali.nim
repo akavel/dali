@@ -205,28 +205,28 @@ proc render*(dex: Dex): string =
   sectionOffsets.add((0x0000'u16, 1'u32, blob.pos))
   # TODO: handle various versions of targetSdkVersion file, not only 035
   blob.puts  "dex\n035\x00"       # Magic prefix
-  blob.put32 |>* adlerSumSlot
+  blob.put32 >>: adlerSumSlot
   blob.skip(20)                   # TODO: Fill sha1 sum
-  blob.put32 |>* fileSizeSlot
+  blob.put32 >>: fileSizeSlot
   blob.put32 0x70                 # Header size
   blob.put32 0x12345678   # Endian constant
   blob.put32 0            # link_size
   blob.put32 0            # link_off
-  blob.put32 |>* mapOffsetSlot
+  blob.put32 >>: mapOffsetSlot
   blob.put32 dex.strings.len.uint32
-  blob.put32 |>* stringIdsOffSlot
+  blob.put32 >>: stringIdsOffSlot
   blob.put32 dex.types.len.uint32
-  blob.put32 |>* typeIdsOffSlot
+  blob.put32 >>: typeIdsOffSlot
   blob.put32 dex.prototypes.len.uint32
-  blob.put32 |>* protoIdsOffSlot
+  blob.put32 >>: protoIdsOffSlot
   blob.put32 dex.fields.len.uint32
-  blob.put32 |>* fieldIdsOffSlot
+  blob.put32 >>: fieldIdsOffSlot
   blob.put32 dex.methods.len.uint32
-  blob.put32 |>* methodIdsOffSlot
+  blob.put32 >>: methodIdsOffSlot
   blob.put32 dex.classes.len.uint32
-  blob.put32 |>* classDefsOffSlot
-  blob.put32 |>* dataSizeSlot
-  blob.put32 |>* dataOffSlot
+  blob.put32 >>: classDefsOffSlot
+  blob.put32 >>: dataSizeSlot
+  blob.put32 >>: dataOffSlot
 
   # blob.reserve(0x70 - blob.pos.int)
   #-- Partially render string_ids
@@ -236,7 +236,7 @@ proc render*(dex: Dex): string =
   blob[stringIdsOffSlot] = blob.pos
   var stringOffsets = newSeq[Slot32](dex.strings.len)
   for i in 0 ..< dex.strings.len:
-    blob.put32 |> stringOffsets[i]
+    blob.put32 >> stringOffsets[i]
   #-- Render typeIDs.
   sectionOffsets.add((0x0002'u16, dex.types.len.uint32, blob.pos))
   blob[typeIdsOffSlot] = blob.pos
@@ -254,7 +254,7 @@ proc render*(dex: Dex): string =
   for p in dex.prototypes:
     blob.put32 stringIds[dex.strings[p.descriptor]].uint32
     blob.put32 dex.types.search(p.ret).uint32
-    blob.put32 |>* slot
+    blob.put32 >>: slot
     typeListOffsets.add(p.params, slot)
     # echo p.ret, " ", p.params
   #-- Render field IDs
@@ -290,7 +290,7 @@ proc render*(dex: Dex): string =
     blob.put32 0'u32      # TODO: interfaces_off
     blob.put32 NO_INDEX   # TODO: source_file_idx
     blob.put32 0'u32      # TODO: annotations_off
-    blob.put32 |>* slot
+    blob.put32 >>: slot
     classDataOffsets.add(c.class, slot)
     blob.put32 0'u32      # TODO: static_values
   #-- Render code items
@@ -311,7 +311,7 @@ proc render*(dex: Dex): string =
         blob.put16 code.outs
         blob.put16 0'u16   # TODO: tries_size
         blob.put32 0'u32   # TODO: debug_info_off
-        blob.put32 |>* slot   # This shall be filled with size of instrs, in 16-bit code units
+        blob.put32 >>: slot   # This shall be filled with size of instrs, in 16-bit code units
         dex.renderInstrs(blob, code.instrs, stringIds)
         blob[slot] = (blob.pos - slot.uint32 - 4) div 2
   if codeItems > 0'u32:

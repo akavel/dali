@@ -65,7 +65,7 @@ test "put4":
 test "slot let op":
   var s = "".Blob
   s.put32 0x1234_5678
-  s.put32 |>* slot
+  s.put32 >>: slot
   s.put32 0x1234_5678
   s[slot] = 0xabcd_ef00'u32
   check s.string.toHex == strip_space"78 56 34 12 00 EF CD AB 78 56 34 12"
@@ -74,7 +74,7 @@ test "slot assign op":
   var s = "".Blob
   var slot: Slot32
   s.put32 0x1234_5678
-  s.put32 |> slot
+  s.put32 >> slot
   s.put32 0x1234_5678
   s[slot] = 0xabcd_ef00'u32
   check s.string.toHex == strip_space"78 56 34 12 00 EF CD AB 78 56 34 12"

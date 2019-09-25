@@ -17,10 +17,10 @@ proc skip*(b: var Blob, n: int) {.inline.} =
   for i in pos ..< b.string.len:
     b.string[i] = chr(0)
 
-template `|>*`*(slot32: Slot32, slot: untyped): untyped =
+template `>>:`*(slot32: Slot32, slot: untyped): untyped =
   let slot = slot32
 
-proc `|>`*(slot32: Slot32, slot: var Slot32) =
+proc `>>`*(slot32: Slot32, slot: var Slot32) =
   slot = slot32
 
 # macro slot*(b: var Blob, block: untyped) =
