@@ -1,7 +1,6 @@
 {.experimental: "codeReordering".}
 import strutils
 import critbits
-import bitops
 import std/sha1
 import sets
 import tables
@@ -361,10 +360,9 @@ proc render*(dex: Dex): string =
   blob[dataSizeSlot] = blob.pos - dataStart  # FIXME: round to 64?
   blob[fileSizeSlot] = blob.pos
   #-- Fill checksums
-  let sha1 = secureHash(blob.string.substr(0x20))
-  let sha1sum = parseHexStr($sha1)  # FIXME(akavel): should not have to go through string!
+  let sha1 = secureHash(blob.string.substr(0x20)).Sha1Digest
   for i in 0 ..< 20:
-    blob.string[0x0c + i] = sha1sum[i]
+    blob.string[0x0c + i] = sha1[i].char
   blob[adlerSumSlot] = adler32(blob.string.substr(0x0c))
   return blob.string
 
@@ -383,11 +381,11 @@ proc collect(dex: Dex) =
         for instr in dm.code.code.instrs:
           for arg in instr.args:
             match arg:
-              RawX(r): discard
-              RawXX(r): discard
-              RawXXXX(r): discard
-              RegX(r): discard
-              RegXX(r): discard
+              RawX(_): discard
+              RawXX(_): discard
+              RawXXXX(_): discard
+              RegX(_): discard
+              RegXX(_): discard
               FieldXXXX(f):
                 dex.addField(f)
               StringXXXX(s):
@@ -544,78 +542,6 @@ proc stringsAsAdded(dex: Dex): seq[string] =
   result.setLen dex.strings.len
   for s, added in dex.strings:
     result[added] = s
-
-proc renderStringsAndOffsets(dex: Dex, baseOffset: int): (string, string) =
-  var
-    ordering = dex.stringsOrdering
-    offsets = newString(4 * dex.strings.len)
-    buf = ""
-    pos = 0
-  for s in dex.stringsAsAdded:
-    offsets.write(4 * ordering[dex.strings[s]], uint32(baseOffset + pos))
-    # FIXME: MUTF-8: encode U+0000 as hex: C0 80
-    # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
-    # FIXME: length *in UTF-16 code units*, as ULEB128
-    pos += buf.write_uleb128(pos, s.len.uint32)
-    pos += buf.write(pos, s & "\x00")
-  return (buf, offsets)
-
-proc sample_dex(tail: string): string =
-  var header = newString(0x2C)
-  # Magic prefix
-  # TODO: handle various versions of targetSdkVersion file, not only 035
-  header.write(0, "dex\n035\x00")
-  # File size
-  header.write(0x20, header.len.uint32 + tail.len.uint32)
-  # Header size
-  header.write(0x24, 0x70'u32)
-  # Endian constant
-  header.write(0x28, 0x12345678)
-
-  # SHA1 hash
-  # TODO: should allow hashing a "stream", to not allocate new string...
-  let sha1 = secureHash(header.substr(0x20) & tail)
-  header.write(0x0c, parseHexStr($sha1))  # FIXME(akavel): should not have to go through string!
-  # Adler checksum
-  header.write(0x08, adler32(header.substr(0x0c) & tail))
-  return header & tail
-
-proc write(s: var string, pos: int, what: string): int {.discardable.} =
-  if pos + what.len > s.len:
-    setLen(s, pos + what.len)
-  copyMem(addr(s[pos]), cstring(what), what.len)
-  return what.len
-
-proc write(s: var string, pos: int, what: uint32): int {.discardable.} =
-  # Little-endian
-  var buf = newString(4)
-  buf[0] = chr(what and 0xff)
-  buf[1] = chr(what shr 8 and 0xff)
-  buf[2] = chr(what shr 16 and 0xff)
-  buf[3] = chr(what shr 24 and 0xff)
-  s.write(pos, buf)
-  return 4
-
-proc write_uleb128(s: var string, pos: int, what: uint32): int =
-  ## Writes an uint32 in ULEB128 (https://source.android.com/devices/tech/dalvik/dex-format#leb128)
-  ## format, returning the number of bytes taken by the encoding.
-  if what == 0:
-    s.write(pos, "\x00")
-    return 1
-  let
-    topBit = fastLog2(what)  # position of the highest bit set
-    n = topBit div 7 + 1         # number of bytes required for ULEB128 encoding of 'what'
-  var
-    buf = newString(n.Natural)
-    work = what
-    i = 0
-  while work >= 0x80'u32:
-    buf[i] = chr(0x80.byte or (work and 0x7F).byte)
-    work = work shr 7
-    inc i
-  buf[i] = chr(work.byte)
-  s.write(pos, buf)
-  return n
 
 func asTuple(m: Method): tuple[class: Type, name: string, proto: Prototype] =
   return (class: m.class, name: m.name, proto: m.prototype)
@@ -805,7 +731,7 @@ macro jclass*(header, body: untyped): untyped =
       procOuts = 0
     const
       # TODO: shouldn't below also contain Final???
-      directMethodPragmas = toSet(["Static", "Private", "Constructor"])
+      directMethodPragmas = toHashSet(["Static", "Private", "Constructor"])
     if procDef[i_pragmas].kind == nnkPragma:
       for p in procDef[i_pragmas]:
         if p.kind notin {nnkIdent, nnkExprColonExpr}:

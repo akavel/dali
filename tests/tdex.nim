@@ -3,72 +3,6 @@ import unittest
 import strutils
 include dali
 
-suite "internals":
-  test "write_uleb128":
-    proc uleb128(n: uint32): string =
-      var s = ""
-      discard s.write_uleb128(0, n)
-      return s
-    check uleb128(0).toHex == strip_space"00"
-    check uleb128(1).toHex == strip_space"01"
-    check uleb128(127).toHex == strip_space"7F"
-    check uleb128(16256).toHex == strip_space"80 7F"
-
-  test "renderStringsAndOffsets unsorted":
-    var dex = newDex()
-    dex.addStr"Lhw;"
-    dex.addStr"Ljava/lang/Object;"
-    dex.addStr"V"
-    dex.addStr"[Ljava/lang/String;"
-    dex.addStr"VL"
-    dex.addStr"main"
-    dex.addStr"Ljava/lang/System;"
-    dex.addStr"Ljava/io/PrintStream;"
-    dex.addStr"out"
-    dex.addStr"Hello World!"
-    dex.addStr"Ljava/lang/String;"
-    dex.addStr"println"
-    let want = strip_space"""
-                               04 .L .h .w .; 00
-12 .L .j .a .v .a ./ .l  .a .n .g ./ .O .b .j .e
-.c .t .; 00 01 .V 00 13  .[ .L .j .a .v .a ./ .l
-.a .n .g ./ .S .t .r .i  .n .g .; 00 02 .V .L 00
-04 .m .a .i .n 00 12 .L  .j .a .v .a ./ .l .a .n
-.g ./ .S .y .s .t .e .m  .; 00 15 .L .j .a .v .a
-./ .i .o ./ .P .r .i .n  .t .S .t .r .e .a .m .;
-00 03 .o .u .t 00 0C .H  .e .l .l .o 20 .W .o .r
-.l .d .! 00 12 .L .j .a  .v .a ./ .l .a .n .g ./
-.S .t .r .i .n .g .; 00  07 .p .r .i .n .t .l .n
-00""".dehexify
-    let (have, offsets) = dex.renderStringsAndOffsets(0x13A)
-    check have.dumpHex == want.dumpHex
-    let wantOffsets = strip_space"""
-A6 01 00 00 3A 01 00 00  8A 01 00 00 40 01 00 00
-B4 01 00 00 76 01 00 00  54 01 00 00 6C 01 00 00
-57 01 00 00 70 01 00 00  A1 01 00 00 C8 01 00 00
-""".dehexify
-    check offsets.dumpHex == wantOffsets.dumpHex
-
-  test "renderStringsAndOffsets":
-    var dex = newDex()
-    dex.addStr"<init>"
-    dex.addStr"Landroid/app/Application;"
-    dex.addStr"Lcom/bugsnag/dexexample/BugsnagApp;"
-    dex.addStr"V"
-    dex.addStr"""~~D8{"min-api":26,"version":"v0.1.14"}"""
-    let want = strip_space"""
-                           063C696E 69743E00 194C616E
-64726F69 642F6170 702F4170 706C6963 6174696F 6E3B0023
-4C636F6D 2F627567 736E6167 2F646578 6578616D 706C652F
-42756773 6E616741 70703B00 01560026 7E7E4438 7B226D69
-6E2D6170 69223A32 362C2276 65727369 6F6E223A 2276302E
-312E3134 227D00
-""".dehexify
-    let (have, offsets) = dex.renderStringsAndOffsets(228)
-    check have.dumpHex == want.dumpHex
-    check offsets.dumpHex == strip_space"""
-E4000000 EC000000 07010000 2C010000 2F010000""".dehexify.dumpHex
-
 let hello_world_apk = strip_space"""
 .d .e .x 0A .0 .3 .5 00  6F 53 89 BC 1E 79 B2 4F
 1F 9C 09 66 15 23 2D 3B  56 65 32 C3 B5 81 B4 5A
@@ -182,15 +116,6 @@ test "synthesized hello_world.apk prettified with macros":
   ))
   check dex.render.dumpHex == hello_world_apk.dumpHex
 
-test "hello world.apk":
-  # Based on: https://github.com/corkami/pics/blob/master/binary/DalvikEXecutable.pdf
-  let want = hello_world_apk
-  let tail = want.substr(0x2C)
-  let have = sample_dex(tail)
-  # check have.hexify == want.hexify
-  # check have.toHex == want.toHex
-  check have.dumpHex == want.dumpHex
-
 let bugsnag_sample_apk = strip_space"""
 6465780A 30333800 7A44CBBB FB4AE841 0286C06A 8DF19000
 3C5DE024 D07326A2 E0010000 70000000 78563412 00000000
@@ -252,7 +177,6 @@ test "synthesized bugsnag.apk (FIXME: except checksums)":
       ]
     )
   ))
-  # check dex.render.tweak_prefix("dex\x0a038").dumpHex == bugsnag_sample_apk.dumpHex
   # FIXME(akavel): don't know why, but the SHA1 sum in bugsnag_sample_apk seems incorrect (!)
   check dex.render.substr(0x20).dumpHex == bugsnag_sample_apk.substr(0x20).dumpHex
 
@@ -275,7 +199,6 @@ test "synthesized bugsnag.apk (FIXME: except checksums) prettified with macros":
         invoke_direct(0, jproto Application.`<init>`())
         return_void()
 
-  # check dex.render.tweak_prefix("dex\x0a038").dumpHex == bugsnag_sample_apk.dumpHex
   # FIXME(akavel): don't know why, but the SHA1 sum in bugsnag_sample_apk seems incorrect (!)
   check dex.render.substr(0x20).dumpHex == bugsnag_sample_apk.substr(0x20).dumpHex
 
@@ -424,9 +347,6 @@ test "synthesized hello_android.apk prettified with macros":
 
   check dex.render.dumpHex == hello_android_apk.dumpHex
 
-proc tweak_prefix(s, prefix: string): string =
-  return prefix & s.substr(prefix.len)
-
 proc strip_space(s: string): string =
   return s.multiReplace(("\n", ""), (" ", ""))
 
@@ -435,18 +355,6 @@ const HexChars = "0123456789ABCDEF"
 func printable(c: char): bool =
   let n = ord(c)
   return 0x21 <= n and n <= 0x7E
-
-proc hexify(s: string): string =
-  # Based on strutils.toHex
-  result = newString(s.len * 2)
-  for pos, c in s:
-    if printable(c):
-      result[pos * 2] = '.'
-      result[pos * 2 + 1] = c
-    else:
-      let n = ord(c)
-      result[pos * 2] = HexChars[n shr 4]
-      result[pos * 2 + 1] = HexChars[n and 0x0F]
 
 proc dehexify(s: string): string =
   result = newString(s.len div 2)

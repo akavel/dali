@@ -1,9 +1,7 @@
 import unittest
-import macros
 import dali
 
 let
-  Object = "Ljava/lang/Object;"
   Application = "Landroid/app/Application;"
   Activity = "Landroid/app/Activity;"
   Bundle = "Landroid/os/Bundle;"
