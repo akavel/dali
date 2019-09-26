@@ -549,9 +549,9 @@ proc descriptor(proto: Prototype): string =
 proc addTypeList(dex: Dex, ts: seq[Type]) =
   if ts.len == 0:
     return
-  for p in ts:
-    dex.addType(p)
-  if not dex.typeLists.contains(ts):
+  for t in ts:
+    dex.addType(t)
+  if ts notin dex.typeLists:
     dex.typeLists.add(ts)
 
 proc addType(dex: Dex, t: Type) =
