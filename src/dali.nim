@@ -1,5 +1,6 @@
 {.experimental: "codeReordering".}
 import strutils
+import sequtils
 import critbits
 import std/sha1
 import sets
@@ -542,9 +543,8 @@ proc descriptor(proto: Prototype): string =
       return "L"
     else:
       raise newException(ConsistencyError, "unexpected type in prototype: " & t)
-  result = typeChar(proto.ret)
-  for p in proto.params:
-    result &= typeChar(p)
+
+  return (proto.ret & proto.params).map(typeChar).join
 
 proc addTypeList(dex: Dex, ts: seq[Type]) =
   if ts.len == 0:
