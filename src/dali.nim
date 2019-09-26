@@ -195,6 +195,7 @@ proc render*(dex: Dex): string =
   # NOTE: n is number of elements in the section, not length in bytes.
   var sections: seq[tuple[kind: uint16, pos: uint32, n: int]]
 
+  # blob is the buffer where we will render the binary contents of the .dex file
   var blob: Blob
 
   # slots are places in the blob, where we can't put data immediately. That's
@@ -248,6 +249,7 @@ proc render*(dex: Dex): string =
   blob.put32 >> slots.dataOff
 
   # blob.reserve(0x70 - blob.pos.int)
+
   #-- Partially render string_ids
   # We preallocate space for the list of string offsets. We cannot fill it yet, as its contents
   # will depend on the size of the other segments.
@@ -255,6 +257,7 @@ proc render*(dex: Dex): string =
   blob[slots.stringIdsOff] = blob.pos
   for i in 0 ..< dex.strings.len:
     blob.put32 >> slots.stringOffsets[i]
+
   #-- Render typeIDs.
   sections.add (0x0002'u16, blob.pos, dex.types.len)
   blob[slots.typeIdsOff] = blob.pos
@@ -263,6 +266,7 @@ proc render*(dex: Dex): string =
   # to sort again by type IDs
   for t in dex.types:
     blob.put32 stringIds[dex.strings[t]].uint32
+
   #-- Partially render proto IDs.
   # We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
   # segments inbetween.
@@ -275,6 +279,7 @@ proc render*(dex: Dex): string =
     blob.put32 >>: slot
     typeListOffsets.add(p.params, slot)
     # echo p.ret, " ", p.params
+
   #-- Render field IDs
   if dex.fields.len > 0:
     sections.add (0x0004'u16, blob.pos, dex.fields.len)
@@ -283,6 +288,7 @@ proc render*(dex: Dex): string =
     blob.put16 dex.types.search(f.class).uint16
     blob.put16 dex.types.search(f.typ).uint16
     blob.put32 stringIds[dex.strings[f.name]].uint32
+
   #-- Render method IDs
   sections.add (0x0005'u16, blob.pos, dex.methods.len)
   if dex.methods.len > 0:
@@ -292,6 +298,7 @@ proc render*(dex: Dex): string =
     blob.put16 dex.types.search(m.class).uint16
     blob.put16 dex.prototypes.search(m.proto).uint16
     blob.put32 stringIds[dex.strings[m.name]].uint32
+
   #-- Partially render class defs.
   sections.add (0x0006'u16, blob.pos, dex.classes.len)
   blob[slots.classDefsOff] = blob.pos
@@ -311,6 +318,7 @@ proc render*(dex: Dex): string =
     blob.put32 >>: slot
     classDataOffsets.add(c.class, slot)
     blob.put32 0'u32      # TODO: static_values
+
   #-- Render code items
   let dataStart = blob.pos
   blob[slots.dataOff] = dataStart
@@ -334,6 +342,7 @@ proc render*(dex: Dex): string =
         blob[slot] = (blob.pos - slot.uint32 - 4) div 2
   if codeItems > 0:
     sections.add (0x2001'u16, dataStart, codeItems)
+
   #-- Render type lists
   blob.pad32()
   if dex.typeLists.len > 0:
@@ -344,6 +353,7 @@ proc render*(dex: Dex): string =
     blob.put32 l.len.uint32
     for t in l:
       blob.put16 dex.types.search(t).uint16
+
   #-- Render strings data
   sections.add (0x2002'u16, blob.pos, dex.strings.len)
   for s in dex.stringsAsAdded:
@@ -354,6 +364,7 @@ proc render*(dex: Dex): string =
     # FIXME: length *in UTF-16 code units*, as ULEB128
     blob.put_uleb128 s.len.uint32
     blob.puts s & "\x00"
+
   #-- Render class data
   sections.add (0x2000'u16, blob.pos, dex.classes.len)
   for c in dex.classes:
@@ -367,6 +378,7 @@ proc render*(dex: Dex): string =
     # TODO: instance_fields
     dex.renderEncodedMethods(blob, d.direct_methods, codeOffsets)
     dex.renderEncodedMethods(blob, d.virtual_methods, codeOffsets)
+
   #-- Render map_list
   blob.pad32()
   sections.add (0x1000'u16, blob.pos, 1)
