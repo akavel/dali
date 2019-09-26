@@ -265,7 +265,7 @@ proc parseJClassHeader(header: NimNode): AClassHeaderInfo =
   if rest =~ PragmaExpr(_):
     if rest !~ PragmaExpr([], []):
       error "encountered unexpected syntax (too many words)", rest
-    if rest[1] !~ Pragma(_):
+    if rest !~ PragmaExpr([], Pragma(_)):
       error "expected pragmas list", rest[1]
     for p in rest[1]:
       if p !~ Ident(_):
