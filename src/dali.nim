@@ -702,22 +702,20 @@ macro jclass*(header, body: untyped): untyped =
     if rest !~ PragmaExpr([], Pragma(_)):
       error "jclass expected pragmas list", rest[1]
     for p in rest[1]:
-      if p.kind != nnkIdent:
+      if p !~ Ident(_):
         error "jclass expects a simple pragma identifer", p
       pragmas.add ident(p.strVal.capitalizeAscii)
     rest = rest[0]
   # [jclass] com.foo.[Bar]
   var classPath: seq[string]
-  while rest.kind == nnkDotExpr:
-    if rest.len != 2:
-      error "jclass expects 2 elements separated by dot", rest
+  while rest =~ DotExpr(_):
     # TODO: allow and handle "$" character in class names
-    if rest[1].kind != nnkIdent:
-      error "jclass expects dot-separated simple identifiers", rest[1]
+    if rest !~ DotExpr([], Ident(_)):
+      error "jclass expects 2+ dot-separated simple identifiers", rest
     classPath.add rest[1].strVal
     rest = rest[0]
   # [jclass com.foo.]Bar
-  if rest.kind != nnkIdent:
+  if rest !~ Ident(_):
     error "jclass expects dot-separated simple identifiers", rest
   classPath.add rest.strVal
   # After the processing above, classPath has unnatural, reversed order of segments; fix this
@@ -729,13 +727,13 @@ macro jclass*(header, body: untyped): untyped =
   let classString = "L" & classPath.join("/") & ";"
 
   # Parse class body - a list of proc definitions
-  if body.kind != nnkStmtList:
+  if body !~ StmtList(_):
     error "jclass expects a list of proc definitions", body
   var
     directMethods: seq[NimNode]
     virtualMethods: seq[NimNode]
   for procDef in body:
-    if procDef.kind != nnkProcDef:
+    if procDef !~ ProcDef(_):
       error "jclass expects a list of proc definitions", procDef
     # Parse proc header
     const
@@ -746,10 +744,11 @@ macro jclass*(header, body: untyped): untyped =
       i_pragmas = 4
       i_body = 6
     # proc name must be a simple identifier, or backtick-quoted name
-    if procDef[i_name].kind notin {nnkIdent, nnkAccQuoted}:
-      error "jclass expects a proc name to be a simple identifier, or a backtick-quoted name", procDef[0]
-    if procDef[1].kind != nnkEmpty: error "unexpected term rewriting pattern in jclass proc", procDef[1]
-    if procDef[2].kind != nnkEmpty: error "unexpected generic type param in jclass proc", procDef[2]
+    if procDef[i_name] !~ Ident(_) and
+      procDef[i_name] !~ AccQuoted(_):
+      error "jclass expects a proc name to be a simple identifier, or a backtick-quoted name", procDef[i_name]
+    if procDef[1] !~ Empty(): error "unexpected term rewriting pattern in jclass proc", procDef[1]
+    if procDef[2] !~ Empty(): error "unexpected generic type param in jclass proc", procDef[2]
     # proc pragmas
     var
       procPragmas: seq[NimNode]
@@ -760,26 +759,24 @@ macro jclass*(header, body: untyped): untyped =
     const
       # TODO: shouldn't below also contain Final???
       directMethodPragmas = toHashSet(["Static", "Private", "Constructor"])
-    if procDef[i_pragmas].kind == nnkPragma:
+    if procDef[i_pragmas] =~ Pragma(_):
       for p in procDef[i_pragmas]:
-        if p.kind notin {nnkIdent, nnkExprColonExpr}:
-          error "unexpected format of pragma in jclass proc", p
-        if p.kind == nnkIdent:
+        if p =~ Ident(_):
           let capitalized = p.strVal.capitalizeAscii
           procPragmas.add ident(capitalized)
           if capitalized in directMethodPragmas:
             isDirect = true
-        else:
-          if p[0].kind != nnkIdent: error "unexpected format of pragma in jclass proc", p[0]
-          if p[1].kind != nnkIntLit: error "unexpected format of pragma in jclass proc", p[1]
+        elif p =~ ExprColonExpr(Ident(_), IntLit(_)):
           case p[0].strVal
           of "regs": procRegs = p[1].intVal.int
           of "ins":  procIns = p[1].intVal.int
           of "outs": procOuts = p[1].intVal.int
           else: error "expected one of: 'regs: N', 'ins: N', 'outs: N' or access pragmas", p[0]
+        else:
+          error "unexpected format of pragma in jclass proc", p
     # proc return type
     var ret: NimNode = newLit("V")
-    if procDef[i_params][0].kind != nnkEmpty:
+    if procDef[i_params][0] !~ Empty():
       ret = procDef[i_params][0].handleJavaType
     # check & collect proc params
     var params: seq[NimNode]
@@ -788,15 +785,13 @@ macro jclass*(header, body: untyped): untyped =
       let
         rawParams = procDef[i_params][1]
         n = rawParams.len
-      if rawParams[n-1].kind != nnkEmpty: error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-1]
-      if rawParams[n-2].kind != nnkEmpty: error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-2]
+      if rawParams[n-1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-1]
+      if rawParams[n-2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-2]
       for i in 0..<rawParams.len-2:
         params.add rawParams[i].handleJavaType
     # check proc body
     var pbody: seq[NimNode]
-    if procDef[i_body].kind notin {nnkEmpty, nnkStmtList}:
-      error "unexpected syntax of jclass proc body", procDef[i_body]
-    if procDef[i_body].kind == nnkStmtList:
+    if procDef[i_body] =~ StmtList(_):
       for stmt in procDef[i_body]:
         case stmt.kind
         of nnkCall:
@@ -810,6 +805,10 @@ macro jclass*(header, body: untyped): untyped =
           pbody.add newCall(stmt)
         else:
           error "jclass expects proc body to contain only Android assembly instructions", stmt
+    elif procDef[i_body] =~ Empty():
+      discard
+    else:
+      error "unexpected syntax of jclass proc body", procDef[i_body]
 
     # Rewrite the procedure as an EncodedMethod object
     let
@@ -853,7 +852,7 @@ macro jclass*(header, body: untyped): untyped =
     classTree = newLit(classString)
     accessTree = newTree(nnkCurly, pragmas)
     superclassTree =
-      if super.kind == nnkEmpty:
+      if super =~ Empty():
         quote do:
           NoType()
       else:
