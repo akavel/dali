@@ -196,47 +196,68 @@ proc render*(dex: Dex): string =
   var sections: seq[tuple[kind: uint16, pos: uint32, n: int]]
 
   var blob: Blob
+
+  # slots are places in the blob, where we can't put data immediately. That's
+  # because the value that should be there depends on some data further along
+  # in the file. We bookmark some space for them in the blob, for filling in
+  # later, when we will know what to put in the slot.
+  var slots: tuple[
+    adlerSum: Slot32,
+    fileSize: Slot32,
+    mapOffset: Slot32,
+    stringIdsOff: Slot32,
+    typeIdsOff: Slot32,
+    protoIdsOff: Slot32,
+    fieldIdsOff: Slot32,
+    methodIdsOff: Slot32,
+    classDefsOff: Slot32,
+    dataSize: Slot32,
+    dataOff: Slot32,
+    stringOffsets: seq[Slot32],
+  ]
+  slots.stringOffsets.setLen(dex.strings.len)
+
   # FIXME: ensure correct padding everywhere
+
   #-- Partially render header
   # Most of it can only be calculated after the rest of the segments.
   sections.add (0x0000'u16, blob.pos, 1)
   # TODO: handle various versions of targetSdkVersion file, not only 035
   blob.puts  "dex\n035\x00"       # Magic prefix
-  blob.put32 >>: adlerSumSlot
-  blob.skip(20)                   # TODO: Fill sha1 sum
-  blob.put32 >>: fileSizeSlot
+  blob.put32 >> slots.adlerSum
+  blob.skip(20)                   # SHA1 sum; we will fill it much later
+  blob.put32 >> slots.fileSize
   blob.put32 0x70                 # Header size
   blob.put32 0x12345678   # Endian constant
   blob.put32 0            # link_size
   blob.put32 0            # link_off
-  blob.put32 >>: mapOffsetSlot
+  blob.put32 >> slots.mapOffset
   blob.put32 dex.strings.len.uint32
-  blob.put32 >>: stringIdsOffSlot
+  blob.put32 >> slots.stringIdsOff
   blob.put32 dex.types.len.uint32
-  blob.put32 >>: typeIdsOffSlot
+  blob.put32 >> slots.typeIdsOff
   blob.put32 dex.prototypes.len.uint32
-  blob.put32 >>: protoIdsOffSlot
+  blob.put32 >> slots.protoIdsOff
   blob.put32 dex.fields.len.uint32
-  blob.put32 >>: fieldIdsOffSlot
+  blob.put32 >> slots.fieldIdsOff
   blob.put32 dex.methods.len.uint32
-  blob.put32 >>: methodIdsOffSlot
+  blob.put32 >> slots.methodIdsOff
   blob.put32 dex.classes.len.uint32
-  blob.put32 >>: classDefsOffSlot
-  blob.put32 >>: dataSizeSlot
-  blob.put32 >>: dataOffSlot
+  blob.put32 >> slots.classDefsOff
+  blob.put32 >> slots.dataSize
+  blob.put32 >> slots.dataOff
 
   # blob.reserve(0x70 - blob.pos.int)
   #-- Partially render string_ids
   # We preallocate space for the list of string offsets. We cannot fill it yet, as its contents
   # will depend on the size of the other segments.
   sections.add (0x0001'u16, blob.pos, dex.strings.len)
-  blob[stringIdsOffSlot] = blob.pos
-  var stringOffsets = newSeq[Slot32](dex.strings.len)
+  blob[slots.stringIdsOff] = blob.pos
   for i in 0 ..< dex.strings.len:
-    blob.put32 >> stringOffsets[i]
+    blob.put32 >> slots.stringOffsets[i]
   #-- Render typeIDs.
   sections.add (0x0002'u16, blob.pos, dex.types.len)
-  blob[typeIdsOffSlot] = blob.pos
+  blob[slots.typeIdsOff] = blob.pos
   let stringIds = dex.stringsOrdering
   # dex.types are already stored sorted, same as dex.strings, so we don't need
   # to sort again by type IDs
@@ -246,7 +267,7 @@ proc render*(dex: Dex): string =
   # We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
   # segments inbetween.
   sections.add (0x0003'u16, blob.pos, dex.prototypes.len)
-  blob[protoIdsOffSlot] = blob.pos
+  blob[slots.protoIdsOff] = blob.pos
   var typeListOffsets: Slots32[seq[Type]]
   for p in dex.prototypes:
     blob.put32 stringIds[dex.strings[p.descriptor]].uint32
@@ -257,7 +278,7 @@ proc render*(dex: Dex): string =
   #-- Render field IDs
   if dex.fields.len > 0:
     sections.add (0x0004'u16, blob.pos, dex.fields.len)
-    blob[fieldIdsOffSlot] = blob.pos
+    blob[slots.fieldIdsOff] = blob.pos
   for f in dex.fields:
     blob.put16 dex.types.search(f.class).uint16
     blob.put16 dex.types.search(f.typ).uint16
@@ -265,7 +286,7 @@ proc render*(dex: Dex): string =
   #-- Render method IDs
   sections.add (0x0005'u16, blob.pos, dex.methods.len)
   if dex.methods.len > 0:
-    blob[methodIdsOffSlot] = blob.pos
+    blob[slots.methodIdsOff] = blob.pos
   for m in dex.methods:
     # echo $m
     blob.put16 dex.types.search(m.class).uint16
@@ -273,7 +294,7 @@ proc render*(dex: Dex): string =
     blob.put32 stringIds[dex.strings[m.name]].uint32
   #-- Partially render class defs.
   sections.add (0x0006'u16, blob.pos, dex.classes.len)
-  blob[classDefsOffSlot] = blob.pos
+  blob[slots.classDefsOff] = blob.pos
   var classDataOffsets: Slots32[Type]
   const NO_INDEX = 0xffff_ffff'u32
   for c in dex.classes:
@@ -292,7 +313,7 @@ proc render*(dex: Dex): string =
     blob.put32 0'u32      # TODO: static_values
   #-- Render code items
   let dataStart = blob.pos
-  blob[dataOffSlot] = dataStart
+  blob[slots.dataOff] = dataStart
   var
     codeItems = 0
     codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]
@@ -326,7 +347,7 @@ proc render*(dex: Dex): string =
   #-- Render strings data
   sections.add (0x2002'u16, blob.pos, dex.strings.len)
   for s in dex.stringsAsAdded:
-    let slot = stringOffsets[stringIds[dex.strings[s]]]
+    let slot = slots.stringOffsets[stringIds[dex.strings[s]]]
     blob[slot] = blob.pos
     # FIXME: MUTF-8: encode U+0000 as hex: C0 80
     # FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
@@ -349,7 +370,7 @@ proc render*(dex: Dex): string =
   #-- Render map_list
   blob.pad32()
   sections.add (0x1000'u16, blob.pos, 1)
-  blob[mapOffsetSlot] = blob.pos
+  blob[slots.mapOffset] = blob.pos
   blob.put32 sections.len.uint32
   for s in sections:
     blob.put16 s.kind
@@ -358,13 +379,13 @@ proc render*(dex: Dex): string =
     blob.put32 s.pos
 
   #-- Fill remaining slots related to file size
-  blob[dataSizeSlot] = blob.pos - dataStart  # FIXME: round to 64?
-  blob[fileSizeSlot] = blob.pos
+  blob[slots.dataSize] = blob.pos - dataStart  # FIXME: round to 64?
+  blob[slots.fileSize] = blob.pos
   #-- Fill checksums
   let sha1 = secureHash(blob.string.substr(0x20)).Sha1Digest
   for i in 0 ..< 20:
     blob.string[0x0c + i] = sha1[i].char
-  blob[adlerSumSlot] = adler32(blob.string.substr(0x0c))
+  blob[slots.adlerSum] = adler32(blob.string.substr(0x0c))
   return blob.string
 
 
