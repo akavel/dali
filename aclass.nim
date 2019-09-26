@@ -4,6 +4,7 @@ import strutils
 import algorithm
 import sets
 import src / dali
+import src / dali / macromatch
 import jni_wrapper
 
 # Goal sketch:
@@ -25,21 +26,19 @@ import jni_wrapper
 #       self.x = y
 #       return jstring("x = {}" % self.x)
 
+
 macro classes_dex*(body: untyped): untyped =
   result = nnkStmtList.newTree()
   # echo body.treeRepr
 
   # Expecting a list of "aclass Foo {.public.} of Bar:" definitions
-  if body.kind != nnkStmtList:
+  if body !~ StmtList(_):
     error "classes_dex expects a list of 'aclass' definitions", body
   var
     classes: seq[NimNode]
     nativeProcs: seq[NimNode]
   for c in body:
-    if c.kind != nnkCommand or
-      c[0].kind != nnkIdent or
-      c[0].strVal != "aclass" or
-      c.len != 3:
+    if c !~ Command(Ident("aclass"), [], []):
       error "classes_dex expects a list of 'aclass' definitions", c[0]
     let (class, natProcs) = handleAclass(c[1], c[2])
     classes.add class
@@ -75,35 +74,31 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
   var super = newEmptyNode()
   var rest = header
   # [aclass com.foo.Bar {.public.}] of Activity
-  if header.kind == nnkInfix and
-    header[0].kind == nnkIdent and
-    header[0].strVal == "of":
+  if header =~ Infix(Ident("of"), _):
     super = header[2]  # TODO: copyNimNode ?
     rest = header[1]
   # [aclass com.foo.Bar] {.public.}
   var pragmas: seq[NimNode]
-  if rest.kind == nnkPragmaExpr:
+  if rest =~ PragmaExpr(_):
     if rest.len != 2:
       error "aclass encountered unexpected syntax (too many words)", rest
-    if rest[1].kind != nnkPragma:
+    if rest[1] !~ Pragma(_):
       error "aclass expected pragmas list", rest[1]
     for p in rest[1]:
-      if p.kind != nnkIdent:
+      if p !~ Ident(_):
         error "aclass expects a simple pragma identifer", p
       pragmas.add ident(p.strVal.capitalizeAscii)
     rest = rest[0]
   # [aclass] com.foo.[Bar]
   var classPath: seq[string]
-  while rest.kind == nnkDotExpr:
-    if rest.len != 2:
-      error "aclass expects 2 elements separated by dot", rest
+  while rest =~ DotExpr(_):
     # TODO: allow and handle "$" character in class names
-    if rest[1].kind != nnkIdent:
-      error "aclass expects dot-separated simple identifiers", rest[1]
+    if rest !~ DotExpr([], Ident(_)):
+      error "aclass expects 2+ dot-separated simple identifiers", rest
     classPath.add rest[1].strVal
     rest = rest[0]
   # [aclass com.foo.]Bar
-  if rest.kind != nnkIdent:
+  if rest !~ Ident(_):
     error "aclass expects dot-separated simple identifiers", rest
   classPath.add rest.strVal
   # After the processing above, classPath has unnatural, reversed order of segments; fix this
@@ -115,14 +110,14 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
   let classString = "L" & classPath.join("/") & ";"
 
   # Parse class body - a list of proc definitions
-  if body.kind != nnkStmtList:
+  if body !~ StmtList(_):
     error "aclass expects a list of proc definitions", body
   var
     directMethods: seq[NimNode]
     virtualMethods: seq[NimNode]
     nativeMethods: seq[NimNode]
   for procDef in body:
-    if procDef.kind != nnkProcDef:
+    if procDef !~ ProcDef(_):
       error "aclass expects a list of proc definitions", procDef
     # Parse proc header
     const
@@ -133,10 +128,11 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
       i_pragmas = 4
       i_body = 6
     # proc name must be a simple identifier, or backtick-quoted name
-    if procDef[i_name].kind notin {nnkIdent, nnkAccQuoted}:
+    if procDef[i_name] !~ Ident(_) and
+      procDef[i_name] !~ AccQuoted(_):
       error "aclass expects a proc name to be a simple identifier, or a backtick-quoted name", procDef[0]
-    if procDef[1].kind != nnkEmpty: error "unexpected term rewriting pattern in aclass proc", procDef[1]
-    if procDef[2].kind != nnkEmpty: error "unexpected generic type param in aclass proc", procDef[2]
+    if procDef[1] !~ Empty(): error "unexpected term rewriting pattern in aclass proc", procDef[1]
+    if procDef[2] !~ Empty(): error "unexpected generic type param in aclass proc", procDef[2]
     # proc pragmas
     var
       procPragmas: seq[NimNode]
@@ -148,45 +144,39 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
     let
       # TODO: shouldn't below also contain Final???
       directMethodPragmas = toSet(["Static", "Private", "Constructor"])
-    if procDef[i_pragmas].kind == nnkPragma:
+    if procDef[i_pragmas] =~ Pragma(_):
       for p in procDef[i_pragmas]:
-        if p.kind notin {nnkIdent, nnkExprColonExpr}:
-          error "unexpected format of pragma in aclass proc", p
-        if p.kind == nnkIdent:
+        if p =~ Ident(_):
           let capitalized = p.strVal.capitalizeAscii
           procPragmas.add ident(capitalized)
           if capitalized in directMethodPragmas:
             isDirect = true
           elif capitalized == "Native":
             isNative = true
-        else:
-          if p[0].kind != nnkIdent: error "unexpected format of pragma in aclass proc", p[0]
-          if p[1].kind != nnkIntLit: error "unexpected format of pragma in aclass proc", p[1]
+        elif p =~ ExprColonExpr(Ident(_), IntLit(_)):
           case p[0].strVal
           of "regs": procRegs = p[1].intVal.int
           of "ins":  procIns = p[1].intVal.int
           of "outs": procOuts = p[1].intVal.int
           else: error "expected one of: 'regs: N', 'ins: N', 'outs: N' or access pragmas", p[0]
+        else:
+          error "unexpected format of pragma in aclass proc", p
     # proc return type
     var ret: NimNode = newLit("V")
-    if procDef[i_params][0].kind != nnkEmpty:
+    if procDef[i_params][0] !~ Empty():
       ret = procDef[i_params][0].handleJavaType
     # check & collect proc params
     var params: seq[NimNode]
     if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
     if procDef[i_params].len == 2:
-      let
-        rawParams = procDef[i_params][1]
-        n = rawParams.len
-      if rawParams[n-1].kind != nnkEmpty: error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-1]
-      if rawParams[n-2].kind != nnkEmpty: error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-2]
-      for i in 0..<rawParams.len-2:
-        params.add rawParams[i].handleJavaType
+      let rawParams = procDef[i_params][1]
+      if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
+      if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
+      for p in rawParams[0..^3]:
+        params.add p.handleJavaType
     # check proc body
     var pbody: seq[NimNode]
-    if procDef[i_body].kind notin {nnkEmpty, nnkStmtList}:
-      error "unexpected syntax of aclass proc body", procDef[i_body]
-    if procDef[i_body].kind == nnkStmtList:
+    if procDef[i_body] =~ StmtList(_):
       if isNative:
         nativeMethods.add handleNativeMethod(classPath, procDef)
       else:
@@ -203,7 +193,11 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
             pbody.add newCall(stmt)
           else:
             error "aclass expects proc body to contain only Android assembly instructions", stmt
-    echo nativeMethods.repr
+    elif procDef[i_body] =~ Empty():
+      discard
+    else:
+      error "unexpected syntax of aclass proc body", procDef[i_body]
+    # echo nativeMethods.repr
 
     # Rewrite the procedure as an EncodedMethod object
     let
@@ -247,7 +241,7 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
     classTree = newLit(classString)
     accessTree = newTree(nnkCurly, pragmas)
     superclassTree =
-      if super.kind == nnkEmpty:
+      if super =~ Empty():
         quote do:
           NoType()
       else:
@@ -372,3 +366,7 @@ classes_dex:
     proc stringFromJNI(): jstring {.public, native.} =
       return jenv.NewStringUTF(jenv, "Hello from Nim aclass :D")
 
+# dumpTree:
+#   if foo =~ Ident([]):
+#     while bar =~ Biz(_):
+#       discard

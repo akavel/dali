@@ -782,13 +782,11 @@ macro jclass*(header, body: untyped): untyped =
     var params: seq[NimNode]
     if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
     if procDef[i_params].len == 2:
-      let
-        rawParams = procDef[i_params][1]
-        n = rawParams.len
-      if rawParams[n-1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-1]
-      if rawParams[n-2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[n-2]
-      for i in 0..<rawParams.len-2:
-        params.add rawParams[i].handleJavaType
+      let rawParams = procDef[i_params][1]
+      if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
+      if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
+      for p in rawParams[0..^3]:
+        params.add p.handleJavaType
     # check proc body
     var pbody: seq[NimNode]
     if procDef[i_body] =~ StmtList(_):
