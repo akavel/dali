@@ -291,11 +291,11 @@ proc render*(dex: Dex): string =
     classDataOffsets.add(c.class, slot)
     blob.put32 0'u32      # TODO: static_values
   #-- Render code items
-  let codeOffset = blob.pos
-  var codeItems = 0
-  blob[dataOffSlot] = blob.pos
   let dataStart = blob.pos
-  var codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]
+  blob[dataOffSlot] = dataStart
+  var
+    codeItems = 0
+    codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]
   for c in dex.classes:
     let cd = c.class_data
     for dm in cd.direct_methods & cd.virtual_methods:
@@ -312,7 +312,7 @@ proc render*(dex: Dex): string =
         dex.renderInstrs(blob, code.instrs, stringIds)
         blob[slot] = (blob.pos - slot.uint32 - 4) div 2
   if codeItems > 0:
-    sections.add (0x2001'u16, codeOffset, codeItems)
+    sections.add (0x2001'u16, dataStart, codeItems)
   #-- Render type lists
   blob.pad32()
   if dex.typeLists.len > 0:
