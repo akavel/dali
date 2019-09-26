@@ -11,6 +11,7 @@ import macros
 import patty
 import dali/sortedset
 import dali/blob
+import dali/macromatch
 
 # NOTE(akavel): this must be early, to make sure it's used, as codeReordering fails to move it
 proc `<`(p1, p2: Prototype): bool =
@@ -636,26 +637,20 @@ macro jproto*(prototype: untyped): untyped =
   # Parse & verify that proto has correct syntax
   # ...return type if present
   var rett = newLit("V")
-  if proto.kind == nnkInfix and
-    proto[0].kind == nnkIdent and
-    proto[0].strVal == "->" and
-    proto[2].kind == nnkIdent:
+  if proto =~ Infix(Ident("->"), [], Ident(_)):
     rett = proto[2].handleJavaType
     proto = proto[1]
   # ...class & method name:
-  if proto.kind != nnkCall:
+  if proto !~ Call(_):
     error "jproto expects a method declaration as an argument", proto
-  if proto.len == 0:
-    error "jproto expects a method declaration of length 1+ as an argument", proto
-  if proto[0].kind != nnkDotExpr:
-    error "jproto expects dot-separated class & method name in the argument", proto[0]
-  if proto[0].len != 2 or
-    proto[0][0].kind != nnkIdent or
-    proto[0][1].kind notin {nnkIdent, nnkAccQuoted}:
+  if proto !~ Call(DotExpr(_), _):
+    error "jproto expects dot-separated class & method name in the argument", proto
+  if proto[0] !~ DotExpr(Ident(_), Ident(_)) and
+    proto[0] !~ DotExpr(Ident(_), AccQuoted(_)):
     error "jproto expects exactly 2 dot-separated names in the argument", proto[0]
   # ... parameters list:
   for i in 1..<proto.len:
-    if proto[i].kind != nnkIdent:
+    if proto[i] !~ Ident(_):
       error "jproto expects type names as method parameters", proto[i]
 
   # Build parameters list
@@ -678,7 +673,7 @@ macro jproto*(prototype: untyped): untyped =
   # echo result.repr
 
 proc collectProcName*(n: NimNode): NimNode =
-  if n.kind == nnkIdent:
+  if n =~ Ident(_):
     newLit(n.strVal)
   else:
     var buf = ""
@@ -696,17 +691,15 @@ macro jclass*(header, body: untyped): untyped =
   var super = newEmptyNode()
   var rest = header
   # [jclass com.foo.Bar {.public.}] of Activity
-  if header.kind == nnkInfix and
-    header[0].kind == nnkIdent and
-    header[0].strVal == "of":
+  if header =~ Infix(Ident("of"), _):
     super = header[2]  # TODO: copyNimNode ?
     rest = header[1]
   # [jclass com.foo.Bar] {.public.}
   var pragmas: seq[NimNode]
-  if rest.kind == nnkPragmaExpr:
+  if rest =~ PragmaExpr(_):
     if rest.len != 2:
       error "jclass encountered unexpected syntax (too many words)", rest
-    if rest[1].kind != nnkPragma:
+    if rest !~ PragmaExpr([], Pragma(_)):
       error "jclass expected pragmas list", rest[1]
     for p in rest[1]:
       if p.kind != nnkIdent:
