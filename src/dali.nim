@@ -536,11 +536,12 @@ proc addPrototype(dex: Dex, proto: Prototype) =
 
 proc descriptor(proto: Prototype): string =
   proc typeChar(t: Type): string =
-    case t
-    of "V", "Z", "B", "S", "C", "I", "J", "F", "D": return t
+    if t.len==1 and t[0] in {'V','Z','B','S','C','I','J','F','D'}:
+      return t
+    elif t.len>=1 and t[0] in {'[','L'}:
+      return "L"
     else:
-      if t.startsWith"[" or t.startsWith"L": return "L"
-      else: raise newException(ConsistencyError, "unexpected type in prototype: " & t)
+      raise newException(ConsistencyError, "unexpected type in prototype: " & t)
   result = typeChar(proto.ret)
   for p in proto.params:
     result &= typeChar(p)
