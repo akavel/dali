@@ -195,8 +195,8 @@ proc render*(dex: Dex): string =
   # NOTE: n is number of elements in the section, not length in bytes.
   var sections: seq[tuple[kind: uint16, pos: uint32, n: int]]
 
+  var blob: Blob
   # FIXME: ensure correct padding everywhere
-  var blob = "".Blob
   #-- Partially render header
   # Most of it can only be calculated after the rest of the segments.
   sections.add (0x0000'u16, blob.pos, 1)
