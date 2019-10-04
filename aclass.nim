@@ -71,38 +71,11 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
   # echo "----------"
 
   # Parse class header (class name & various modifiers)
-  var super = newEmptyNode()
-  var rest = header
-  # [aclass com.foo.Bar {.public.}] of Activity
-  if header =~ Infix(Ident("of"), _):
-    super = header[2]  # TODO: copyNimNode ?
-    rest = header[1]
-  # [aclass com.foo.Bar] {.public.}
-  var pragmas: seq[NimNode]
-  if rest =~ PragmaExpr(_):
-    if rest.len != 2:
-      error "aclass encountered unexpected syntax (too many words)", rest
-    if rest[1] !~ Pragma(_):
-      error "aclass expected pragmas list", rest[1]
-    for p in rest[1]:
-      if p !~ Ident(_):
-        error "aclass expects a simple pragma identifer", p
-      pragmas.add ident(p.strVal.capitalizeAscii)
-    rest = rest[0]
-  # [aclass] com.foo.[Bar]
-  var classPath: seq[string]
-  while rest =~ DotExpr(_):
-    # TODO: allow and handle "$" character in class names
-    if rest !~ DotExpr([], Ident(_)):
-      error "aclass expects 2+ dot-separated simple identifiers", rest
-    classPath.add rest[1].strVal
-    rest = rest[0]
-  # [aclass com.foo.]Bar
-  if rest !~ Ident(_):
-    error "aclass expects dot-separated simple identifiers", rest
-  classPath.add rest.strVal
-  # After the processing above, classPath has unnatural, reversed order of segments; fix this
-  reverse(classPath)
+  headerInfo = handleAClassHeader(header)
+  var
+    super = headerInfo.super
+    pragmas = headerInfo.pragmas
+    classPath = headerInfo.fullName
   # echo classPath.repr
 
   # Translate the class name to a string understood by Java bytecode. Do it
@@ -263,6 +236,59 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
   result = (
     class: classDef,
     natProcs: nativeMethods)
+
+type AClassHeaderInfo = tuple
+  super: NimNode         # nnkEmpty if no superclass declared
+  pragmas: seq[NimNode]  # pragmas, with first letter modified to uppercase
+  fullName: seq[string]  # Fully Qualified Class Name
+
+proc parseJClassHeader(header: NimNode): AClassHeaderInfo =
+  ## parseJClassHeader parses Java class header (class name & various modifiers)
+  ## specified in Nim-like syntax.
+  ## Example:
+  ##
+  ##     com.akavel.hello2.HelloActivity {.public.} of Activity
+  ##
+  ## corresponds to:
+  ##
+  ##     package com.akavel.hello2;
+  ##     public class HelloActivity extends Activity { ... }
+
+  # [com.foo.Bar {.public.}] of Activity
+  result.super = newEmptyNode()
+  var rest = header
+  if header =~ Infix(Ident("of"), [], []):
+    result.super = header[2]
+    rest = header[1]
+
+  # [com.foo.Bar] {.public.}
+  if rest =~ PragmaExpr(_):
+    if rest !~ PragmaExpr([], []):
+      error "encountered unexpected syntax (too many words)", rest
+    if rest[1] !~ Pragma(_):
+      error "expected pragmas list", rest[1]
+    for p in rest[1]:
+      if p !~ Ident(_):
+        error "expected a simple pragma identifer", p
+      let x = p.copyNimNode()
+      x.strVal = x.strVal.capitalizeAscii
+      pragmas.add x
+    rest = rest[0]
+
+  # com.foo.[Bar]
+  while rest =~ DotExpr(_):
+    # TODO: allow and handle "$" character in class names
+    if rest !~ DotExpr([], Ident(_)):
+      error "expected 2+ dot-separated simple identifiers", rest
+    result.fullName.add rest[1].strVal
+    rest = rest[0]
+
+  # [com.foo.]Bar
+  if rest !~ Ident(_):
+    error "expected dot-separated simple identifiers", rest
+  result.fullname.add rest.strVal
+  # After the processing above, fullName has unnatural, reversed order of segments; fix this
+  reverse(result.fullname)
 
 proc typeLetter(fullType: string): string =
   ## typeLetter returns a one-letter code of a Java/Android primitive type,
