@@ -71,8 +71,8 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
   # echo "----------"
 
   # Parse class header (class name & various modifiers)
-  headerInfo = handleAClassHeader(header)
   var
+    headerInfo = parseJClassHeader(header)
     super = headerInfo.super
     pragmas = headerInfo.pragmas
     classPath = headerInfo.fullName
@@ -270,9 +270,9 @@ proc parseJClassHeader(header: NimNode): AClassHeaderInfo =
     for p in rest[1]:
       if p !~ Ident(_):
         error "expected a simple pragma identifer", p
-      let x = p.copyNimNode()
-      x.strVal = x.strVal.capitalizeAscii
-      pragmas.add x
+      let x = ident(p.strVal.capitalizeAscii)
+      x.copyLineInfo(p)
+      result.pragmas.add x
     rest = rest[0]
 
   # com.foo.[Bar]
