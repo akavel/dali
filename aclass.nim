@@ -34,155 +34,103 @@ macro classes_dex*(body: untyped): untyped =
   # Expecting a list of "aclass Foo {.public.} of Bar:" definitions
   if body !~ StmtList(_):
     error "classes_dex expects a list of 'aclass' definitions", body
-  var
-    classes: seq[NimNode]
-    nativeProcs: seq[NimNode]
   for c in body:
     if c !~ Command(Ident("aclass"), [], []):
-      error "classes_dex expects a list of 'aclass' definitions", c[0]
-    let (class, natProcs) = handleAclass(c[1], c[2])
-    classes.add class
-    nativeProcs.add natProcs
+      error "expected 'aclass' keyword", c
 
-  let
-    dex = genSym()
-    newDex = bindSym"newDex"
-    stdout = bindSym"stdout"
-    write = bindSym"write"
-    render = bindSym"render"
-    nativeProcsTree = newTree(nnkStmtList, nativeProcs)
-    classesTree = block:
-      var tree = newTree(nnkStmtList)
-      for c in classes:
-        tree.add (quote do:
-          `dex`.classes.add(`c`))
-      tree
-  result = quote do:
-    when not defined android:
-      let `dex` = `newDex`()
-      `classesTree`
-      `stdout`.`write`(`dex`.`render`)
-    else:
-      `nativeProcsTree`
+  when defined android:
+    for c in body:
+      result.add aclass2native(c[1], c[2])
 
-proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[NimNode]] =
-  # echo header.treeRepr
-  # echo body.treeRepr
-  # echo "----------"
+  when not defined android:
+    let dex = genSym()
+    let newDex = bindSym"newDex"
+    result.add(quote do:
+      let `dex` = `newDex`())
+    for c in body:
+      let cl = aclass2Class(c)
+      result.add(quote do:
+        `dex`.classes.add(`cl`))
+    let stdout = bindSym"stdout"
+    let write = bindSym"write"
+    let render = bindSym"render"
+    result.add(quote do:
+      `stdout`.`write`(`dex`.`render`))
 
-  # Parse class header (class name & various modifiers)
-  var
-    headerInfo = parseJClassHeader(header)
-    super = headerInfo.super
-    pragmas = headerInfo.pragmas
-    classPath = headerInfo.fullName
-  # echo classPath.repr
+proc aclass2native(header, body: NimNode): seq[NimNode] =
+  var h = parseAClassHeader(header)
+  for procDef in body:
+    let p = parseAClassProc(procDef)
+    if not p.native:
+      continue
+    let
+      # TODO: handle '$' in class names
+      nameAST = ident("Java_" & h.fullName.join("_") & "_" & p.name.strVal)
+      bodyAST = p.body
+      # Note: below procAST is not complete yet at this
+      # phase, but it's a good starting point.
+      procAST = quote do:
+        proc `nameAST`*(jenv: JNIEnvPtr, jthis: jobject) {.cdecl,exportc,dynlib.} =
+          `bodyAST`
+    # Remove `gensym tag from parameters
+    procAST.params[1][0] = ident("jenv")
+    procAST.params[2][0] = ident("jthis")
+    # Transplant the proc's returned type
+    procAST.params[0] = p.ret
+    # Append original proc's parameters to the procAST
+    for param in p.params:
+      procAST.params.add param
+    result.add procAST
+
+proc aclass2Class(header, body: NimNode): NimNode =
+  var h = parseAClassHeader(header)
 
   # Translate the class name to a string understood by Java bytecode. Do it
   # here as it'll be needed below.
-  let classString = "L" & classPath.join("/") & ";"
+  let classString = "L" & h.fullName.join("/") & ";"
 
   # Parse class body - a list of proc definitions
   if body !~ StmtList(_):
-    error "aclass expects a list of proc definitions", body
+    error "expected a list of proc definitions", body
   var
     directMethods: seq[NimNode]
     virtualMethods: seq[NimNode]
-    nativeMethods: seq[NimNode]
   for procDef in body:
-    if procDef !~ ProcDef(_):
-      error "aclass expects a list of proc definitions", procDef
-    # Parse proc header
-    const
-      # important indexes in nnkProcDef children,
-      # see: https://nim-lang.org/docs/macros.html#statements-procedure-declaration
-      i_name = 0
-      i_params = 3
-      i_pragmas = 4
-      i_body = 6
-    # proc name must be a simple identifier, or backtick-quoted name
-    if procDef[i_name] !~ Ident(_) and
-      procDef[i_name] !~ AccQuoted(_):
-      error "aclass expects a proc name to be a simple identifier, or a backtick-quoted name", procDef[0]
-    if procDef[1] !~ Empty(): error "unexpected term rewriting pattern in aclass proc", procDef[1]
-    if procDef[2] !~ Empty(): error "unexpected generic type param in aclass proc", procDef[2]
-    # proc pragmas
-    var
-      procPragmas: seq[NimNode]
-      isDirect = false
-      isNative = false
-      procRegs = 0
-      procIns = 0
-      procOuts = 0
-    let
-      # TODO: shouldn't below also contain Final???
-      directMethodPragmas = toSet(["Static", "Private", "Constructor"])
-    if procDef[i_pragmas] =~ Pragma(_):
-      for p in procDef[i_pragmas]:
-        if p =~ Ident(_):
-          let capitalized = p.strVal.capitalizeAscii
-          procPragmas.add ident(capitalized)
-          if capitalized in directMethodPragmas:
-            isDirect = true
-          elif capitalized == "Native":
-            isNative = true
-        elif p =~ ExprColonExpr(Ident(_), IntLit(_)):
-          case p[0].strVal
-          of "regs": procRegs = p[1].intVal.int
-          of "ins":  procIns = p[1].intVal.int
-          of "outs": procOuts = p[1].intVal.int
-          else: error "expected one of: 'regs: N', 'ins: N', 'outs: N' or access pragmas", p[0]
-        else:
-          error "unexpected format of pragma in aclass proc", p
-    # proc return type
-    var ret: NimNode = newLit("V")
-    if procDef[i_params][0] !~ Empty():
-      ret = procDef[i_params][0].handleJavaType
-    # check & collect proc params
-    var params: seq[NimNode]
-    if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
-    if procDef[i_params].len == 2:
-      let rawParams = procDef[i_params][1]
-      if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
-      if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
-      for p in rawParams[0..^3]:
-        params.add p.handleJavaType
+    let p = parseAClassProc(procDef)
+
     # check proc body
-    var pbody: seq[NimNode]
-    if procDef[i_body] =~ StmtList(_):
-      if isNative:
-        nativeMethods.add handleNativeMethod(classPath, procDef)
+    if p.body =~ Empty():
+      continue
+    if p.body =~ StmtList(_):
+      error "unexpected syntax of proc body", p.body
+    var instrs: seq[NimNode]
+    for stmt in p.body:
+      case stmt.kind
+      of nnkCall:
+        instrs.add stmt
+      of nnkCommand:
+        var call = newTree(nnkCall)
+        stmt.copyChildrenTo(call)
+        call.copyLineInfo(stmt)
+        instrs.add call
+      of nnkIdent:
+        instrs.add newCall(stmt)
       else:
-        for stmt in procDef[i_body]:
-          case stmt.kind
-          of nnkCall:
-            pbody.add stmt
-          of nnkCommand:
-            var call = newTree(nnkCall)
-            stmt.copyChildrenTo(call)
-            call.copyLineInfo(stmt)
-            pbody.add call
-          of nnkIdent:
-            pbody.add newCall(stmt)
-          else:
-            error "aclass expects proc body to contain only Android assembly instructions", stmt
-    elif procDef[i_body] =~ Empty():
-      discard
-    else:
-      error "unexpected syntax of aclass proc body", procDef[i_body]
-    # echo nativeMethods.repr
+        error "expected proc body to contain only Android assembly instructions", stmt
+    p.body = newTree(nnkPrefix, ident("@"),
+      newTree(nnkBracket, instrs))
 
     # Rewrite the procedure as an EncodedMethod object
     let
-      name = procDef[i_name].collectProcName
-      paramsTree = newTree(nnkBracket, params)
-      procAccessTree = newTree(nnkCurly, procPragmas)
-      regsTree = newLit(procRegs)
-      insTree = newLit(procIns)
-      outsTree = newLit(procOuts)
+      name = p.name.collectProcName
+      paramsTree = newTree(nnkBracket, p.params)
+      procAccessTree = newTree(nnkCurly, p.pragmas)
+      regsTree = newLit(p.regs)
+      insTree = newLit(p.ins)
+      outsTree = newLit(p.outs)
       codeTree =
-        if pbody.len > 0:
-          let instrs = newTree(nnkBracket, pbody)
+        if p.body.len > 0:
+          let instrs = newTree(nnkBracket, p.body)
           quote do:
             SomeCode(Code(
               registers: `regsTree`,
@@ -204,7 +152,7 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
         code: `codeTree`)
     # echo enc.repr  # this prints Nim code - Thanks @disruptek on Nim chatroom for the hint!
     # echo enc.treeRepr
-    if isDirect:
+    if p.direct:
       directMethods.add enc
     else:
       virtualMethods.add enc
@@ -223,7 +171,7 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
     directMethodsTree = newTree(nnkBracket, directMethods)
     virtualMethodsTree = newTree(nnkBracket, virtualMethods)
   # TODO: also, create a `let` identifer for the class name
-  let classDef = quote do:
+  result = quote do:
     ClassDef(
       class: `classTree`,
       access: `accessTree`,
@@ -231,19 +179,16 @@ proc handleAclass(header, body: NimNode): tuple[class: NimNode, natProcs: seq[Ni
       class_data: ClassData(
         direct_methods: @`directMethodsTree`,
         virtual_methods: @`virtualMethodsTree`))
-  # echo classDef.repr
 
-  result = (
-    class: classDef,
-    natProcs: nativeMethods)
+
 
 type AClassHeaderInfo = tuple
   super: NimNode         # nnkEmpty if no superclass declared
   pragmas: seq[NimNode]  # pragmas, with first letter modified to uppercase
   fullName: seq[string]  # Fully Qualified Class Name
 
-proc parseJClassHeader(header: NimNode): AClassHeaderInfo =
-  ## parseJClassHeader parses Java class header (class name & various modifiers)
+proc parseAClassHeader(header: NimNode): AClassHeaderInfo =
+  ## parseAClassHeader parses Java class header (class name & various modifiers)
   ## specified in Nim-like syntax.
   ## Example:
   ##
@@ -290,6 +235,68 @@ proc parseJClassHeader(header: NimNode): AClassHeaderInfo =
   # After the processing above, fullName has unnatural, reversed order of segments; fix this
   reverse(result.fullname)
 
+type AClassProcInfo = tuple
+  name: NimNode
+  pragmas: seq[NimNode]
+  direct, native: bool
+  regs, ins, outs: int
+  params: seq[NimNode]
+  ret: NimNode
+  body: NimNode
+
+proc parseAClassProc(procDef: NimNode): AClassProcInfo =
+  if procDef !~ ProcDef(_):
+    error "expected a proc definition", procDef
+  # Parse proc header
+  const
+    # important indexes in nnkProcDef children,
+    # see: https://nim-lang.org/docs/macros.html#statements-procedure-declaration
+    i_name = 0
+    i_params = 3
+    i_pragmas = 4
+    i_body = 6
+  # proc name must be a simple identifier, or backtick-quoted name
+  if procDef[i_name] !~ Ident(_) and procDef[i_name] !~ AccQuoted(_):
+    error "expected a proc name to be a simple identifier, or a backtick-quoted name", procDef[0]
+  if procDef[1] !~ Empty():
+    error "unexpected term rewriting pattern", procDef[1]
+  if procDef[2] !~ Empty():
+    error "unexpected generic type param", procDef[2]
+  # TODO: shouldn't below also contain Final???
+  const directMethodPragmas = toHashSet(["Static", "Private", "Constructor"])
+  if procDef[i_pragmas] =~ Pragma(_):
+    for p in procDef[i_pragmas]:
+      if p =~ Ident(_):
+        let x = ident(p.strVal.capitalizeAscii)
+        x.copyLineInfo(p)
+        result.pragmas.add x
+        if x.strVal in directMethodPragmas:
+          result.direct = true
+        elif x.strVal == "Native":
+          result.native = true
+      elif p =~ ExprColonExpr(Ident(_), IntLit(_)):
+        case p[0].strVal
+        of "regs": result.regs = p[1].intVal.int
+        of "ins":  result.ins = p[1].intVal.int
+        of "outs": result.outs = p[1].intVal.int
+        else: error "expected one of: 'regs: N', 'ins: N', 'outs: N' or access pragmas", p[0]
+      else:
+        error "unexpected format of pragma", p
+  # proc return type
+  result.ret = newLit("V")  # 'void' by default
+  if procDef[i_params][0] !~ Empty():
+    result.ret = procDef[i_params][0].handleJavaType
+  # check & collect proc params
+  if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
+  if procDef[i_params].len == 2:
+    let rawParams = procDef[i_params][1]
+    if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
+    if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
+    for p in rawParams[0..^3]:
+      result.params.add p.handleJavaType
+  # copy proc body
+  result.body = procDef[i_body]
+
 proc typeLetter(fullType: string): string =
   ## typeLetter returns a one-letter code of a Java/Android primitive type,
   ## as represented in bytecode. Returns empty string if the input type is not known.
@@ -319,31 +326,6 @@ proc handleJavaType(n: NimNode): NimNode =
   of "jthrowable": return newLit("Ljava/lang/Throwable;")
   else:
     return copyNimNode(n)
-
-proc handleNativeMethod(classPath: seq[string], procDef: NimNode): NimNode =
-  const
-    # important indexes in nnkProcDef children,
-    # see: https://nim-lang.org/docs/macros.html#statements-procedure-declaration
-    i_name = 0
-    i_params = 3
-    i_body = 6
-  # TODO: handle '$' in class names
-  let
-    procName = ident("Java_" & classPath.join("_") & "_" & procDef[i_name].strVal)
-    bodyTree = procDef[i_body]
-    # Below procTree is not complete yet, but it's a good starting point.
-    procTree = quote do:
-      proc `procName`*(jenv: JNIEnvPtr, jthis: jobject) {.cdecl,exportc,dynlib.} =
-        `bodyTree`
-  # Remove `gensym tag from parameters
-  procTree[i_params][1][0] = ident("jenv")
-  procTree[i_params][2][0] = ident("jthis")
-  # Transplant the proc's returned type
-  procTree[i_params][0] = procDef[i_params][0]
-  # Append original proc's parameters to the procTree
-  for i in 1..<procDef[i_params].len:
-    procTree[i_params].add procDef[i_params][i]
-  return procTree
 
 # let
 #   HelloActivity = jtype com.akavel.hello2.HelloActivity
