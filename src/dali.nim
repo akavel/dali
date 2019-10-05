@@ -251,6 +251,9 @@ proc render*(dex: Dex): string =
   blob.put32 >> slots.dataSize
   blob.put32 >> slots.dataOff
 
+  # stderr.write(blob.string.dumpHex)
+  # stderr.write("\n")
+
   # blob.reserve(0x70 - blob.pos.int)
 
   #-- Partially render string_ids
@@ -260,6 +263,9 @@ proc render*(dex: Dex): string =
   blob[slots.stringIdsOff] = blob.pos
   for i in 0 ..< dex.strings.len:
     blob.put32 >> slots.stringOffsets[i]
+
+  # stderr.write(blob.string.dumpHex)
+  # stderr.write("\n")
 
   #-- Render typeIDs.
   sections.add (0x0002'u16, blob.pos, dex.types.len)
@@ -401,6 +407,9 @@ proc render*(dex: Dex): string =
   for i in 0 ..< 20:
     blob.string[0x0c + i] = sha1[i].char
   blob[slots.adlerSum] = adler32(blob.string.substr(0x0c))
+  # stderr.write(blob.string.dumpHex)
+  # stderr.write("\n")
+
   return blob.string
 
 

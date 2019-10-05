@@ -51,12 +51,17 @@ macro classes_dex*(body: untyped): untyped =
       let cl = aclass2Class(c[1], c[2])
       result.add(quote do:
         `dex`.classes.add(`cl`))
-    # let stdout = bindSym"stdout"
-    let writeFile = bindSym"writeFile"
+    let stdout = bindSym"stdout"
+    let writeBuffer = bindSym"writeBuffer"
+    # let writeFile = bindSym"writeFile"
     let render = bindSym"render"
     result.add(quote do:
-      `writeFile`("classes.dex", `dex`.`render`))
+      # Workaround for https://github.com/nim-lang/Nim/issues/12315
+      # (write & writeFile skip null bytes on Windows)
+      let tmp = `dex`.`render`
+      discard `stdout`.`writeBuffer`(tmp[0].unsafeAddr, tmp.len))
       # `stdout`.`write`(`dex`.`render`))
+      # `writeFile`("classes.dex", `dex`.`render`))
 
 proc aclass2native(header, body: NimNode): seq[NimNode] =
   var h = parseAClassHeader(header)
