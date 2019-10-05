@@ -48,7 +48,7 @@ macro classes_dex*(body: untyped): untyped =
     result.add(quote do:
       let `dex` = `newDex`())
     for c in body:
-      let cl = aclass2Class(c)
+      let cl = aclass2Class(c[1], c[2])
       result.add(quote do:
         `dex`.classes.add(`cl`))
     let stdout = bindSym"stdout"
@@ -98,45 +98,45 @@ proc aclass2Class(header, body: NimNode): NimNode =
   for procDef in body:
     let p = parseAClassProc(procDef)
 
-    # check proc body
-    if p.body =~ Empty():
-      continue
-    if p.body =~ StmtList(_):
-      error "unexpected syntax of proc body", p.body
     var instrs: seq[NimNode]
-    for stmt in p.body:
-      case stmt.kind
-      of nnkCall:
-        instrs.add stmt
-      of nnkCommand:
-        var call = newTree(nnkCall)
-        stmt.copyChildrenTo(call)
-        call.copyLineInfo(stmt)
-        instrs.add call
-      of nnkIdent:
-        instrs.add newCall(stmt)
-      else:
-        error "expected proc body to contain only Android assembly instructions", stmt
-    p.body = newTree(nnkPrefix, ident("@"),
-      newTree(nnkBracket, instrs))
+    if not p.native:
+      # check proc body
+      if p.body =~ Empty():
+        continue
+      if p.body !~ StmtList(_):
+        error "unexpected syntax of proc body", p.body
+      for stmt in p.body:
+        case stmt.kind
+        of nnkCall:
+          instrs.add stmt
+        of nnkCommand:
+          var call = newTree(nnkCall)
+          stmt.copyChildrenTo(call)
+          call.copyLineInfo(stmt)
+          instrs.add call
+        of nnkIdent:
+          instrs.add newCall(stmt)
+        else:
+          error "expected proc body to contain only Android assembly instructions", stmt
 
     # Rewrite the procedure as an EncodedMethod object
     let
       name = p.name.collectProcName
       paramsTree = newTree(nnkBracket, p.params)
+      ret = p.ret
       procAccessTree = newTree(nnkCurly, p.pragmas)
       regsTree = newLit(p.regs)
       insTree = newLit(p.ins)
       outsTree = newLit(p.outs)
       codeTree =
-        if p.body.len > 0:
-          let instrs = newTree(nnkBracket, p.body)
+        if instrs.len > 0:
+          let instrsTree = newTree(nnkBracket, instrs)
           quote do:
             SomeCode(Code(
               registers: `regsTree`,
               ins: `insTree`,
               outs: `outsTree`,
-              instrs: @`instrs`))
+              instrs: @`instrsTree`))
         else:
           quote do:
             NoCode()
@@ -160,7 +160,8 @@ proc aclass2Class(header, body: NimNode): NimNode =
   # Render collected data into a ClassDef object
   let
     classTree = newLit(classString)
-    accessTree = newTree(nnkCurly, pragmas)
+    accessTree = newTree(nnkCurly, h.pragmas)
+    super = h.super
     superclassTree =
       if super =~ Empty():
         quote do:
@@ -255,9 +256,12 @@ proc parseAClassProc(procDef: NimNode): AClassProcInfo =
     i_params = 3
     i_pragmas = 4
     i_body = 6
+
   # proc name must be a simple identifier, or backtick-quoted name
   if procDef[i_name] !~ Ident(_) and procDef[i_name] !~ AccQuoted(_):
     error "expected a proc name to be a simple identifier, or a backtick-quoted name", procDef[0]
+  result.name = procDef[i_name]
+
   if procDef[1] !~ Empty():
     error "unexpected term rewriting pattern", procDef[1]
   if procDef[2] !~ Empty():
@@ -343,36 +347,37 @@ let
   View = "Landroid/view/View;"
   CharSequence = "Ljava/lang/CharSequence;"
 
-classes_dex:
-  aclass com.akavel.hello2.HelloActivity {.public.} of Activity:
-    proc `<clinit>`() {.static, constructor, regs:2, ins:0, outs:1.} =
-      # System.loadLibrary("hello-mello")
-      const_string(0, "hello-mello")
-      invoke_static(0, jproto System.loadLibrary(String))
-      return_void()
-    proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
-      invoke_direct(0, jproto Activity.`<init>`())
-      return_void()
-    proc onCreate(Bundle) {.public, regs:4, ins:2, outs:2.} =
-      # ins: this, arg0
-      # super.onCreate(arg0)
-      invoke_super(2, 3, jproto Activity.onCreate(Bundle))
-      # v0 = new TextView(this)
-      new_instance(0, TextView)
-      invoke_direct(0, 2, jproto TextView.`<init>`(Context))
-      # v1 = this.stringFromJNI()
-      #  NOTE: failure to call a Native function should result in
-      #  java.lang.UnsatisfiedLinkError exception
-      invoke_virtual(2, jproto HelloActivity.stringFromJNI() -> String)
-      move_result_object(1)
-      # v0.setText(v1)
-      invoke_virtual(0, 1, jproto TextView.setText(CharSequence))
-      # this.setContentView(v0)
-      invoke_virtual(2, 0, jproto HelloActivity.setContentView(View))
-      # return
-      return_void()
-    proc stringFromJNI(): jstring {.public, native.} =
-      return jenv.NewStringUTF(jenv, "Hello from Nim aclass :D")
+expandMacros:
+  classes_dex:
+    aclass com.akavel.hello2.HelloActivity {.public.} of Activity:
+      proc `<clinit>`() {.static, constructor, regs:2, ins:0, outs:1.} =
+        # System.loadLibrary("hello-mello")
+        const_string(0, "hello-mello")
+        invoke_static(0, jproto System.loadLibrary(String))
+        return_void()
+      proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
+        invoke_direct(0, jproto Activity.`<init>`())
+        return_void()
+      proc onCreate(Bundle) {.public, regs:4, ins:2, outs:2.} =
+        # ins: this, arg0
+        # super.onCreate(arg0)
+        invoke_super(2, 3, jproto Activity.onCreate(Bundle))
+        # v0 = new TextView(this)
+        new_instance(0, TextView)
+        invoke_direct(0, 2, jproto TextView.`<init>`(Context))
+        # v1 = this.stringFromJNI()
+        #  NOTE: failure to call a Native function should result in
+        #  java.lang.UnsatisfiedLinkError exception
+        invoke_virtual(2, jproto HelloActivity.stringFromJNI() -> String)
+        move_result_object(1)
+        # v0.setText(v1)
+        invoke_virtual(0, 1, jproto TextView.setText(CharSequence))
+        # this.setContentView(v0)
+        invoke_virtual(2, 0, jproto HelloActivity.setContentView(View))
+        # return
+        return_void()
+      proc stringFromJNI(): jstring {.public, native.} =
+        return jenv.NewStringUTF(jenv, "Hello from Nim aclass :D")
 
 # dumpTree:
 #   if foo =~ Ident([]):
