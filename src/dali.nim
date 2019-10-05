@@ -190,6 +190,7 @@ proc newDex*(): Dex =
   new(result)
 
 proc render*(dex: Dex): string =
+  # stderr.write(dex.repr)
   dex.collect()
 
   # Storage for offsets where various sections of the file
@@ -682,149 +683,63 @@ proc collectProcName*(n: NimNode): NimNode =
     newLit(buf)
 
 macro jclass*(header, body: untyped): untyped =
-  result = nnkStmtList.newTree()
-  # echo header.treeRepr
-  # echo body.treeRepr
-  # echo "----------"
+  aclass2Class(header, body)
 
-  # Parse class header (class name & various modifiers)
-  var super = newEmptyNode()
-  var rest = header
-  # [jclass com.foo.Bar {.public.}] of Activity
-  if header =~ Infix(Ident("of"), _):
-    super = header[2]  # TODO: copyNimNode ?
-    rest = header[1]
-  # [jclass com.foo.Bar] {.public.}
-  var pragmas: seq[NimNode]
-  if rest =~ PragmaExpr(_):
-    if rest.len != 2:
-      error "jclass encountered unexpected syntax (too many words)", rest
-    if rest !~ PragmaExpr([], Pragma(_)):
-      error "jclass expected pragmas list", rest[1]
-    for p in rest[1]:
-      if p !~ Ident(_):
-        error "jclass expects a simple pragma identifer", p
-      pragmas.add ident(p.strVal.capitalizeAscii)
-    rest = rest[0]
-  # [jclass] com.foo.[Bar]
-  var classPath: seq[string]
-  while rest =~ DotExpr(_):
-    # TODO: allow and handle "$" character in class names
-    if rest !~ DotExpr([], Ident(_)):
-      error "jclass expects 2+ dot-separated simple identifiers", rest
-    classPath.add rest[1].strVal
-    rest = rest[0]
-  # [jclass com.foo.]Bar
-  if rest !~ Ident(_):
-    error "jclass expects dot-separated simple identifiers", rest
-  classPath.add rest.strVal
-  # After the processing above, classPath has unnatural, reversed order of segments; fix this
-  reverse(classPath)
-  # echo classPath.repr
+proc aclass2Class(header, body: NimNode): NimNode =
+  var h = parseAClassHeader(header)
 
   # Translate the class name to a string understood by Java bytecode. Do it
   # here as it'll be needed below.
-  let classString = "L" & classPath.join("/") & ";"
+  let classString = "L" & h.fullName.join("/") & ";"
 
   # Parse class body - a list of proc definitions
   if body !~ StmtList(_):
-    error "jclass expects a list of proc definitions", body
+    error "expected a list of proc definitions", body
   var
     directMethods: seq[NimNode]
     virtualMethods: seq[NimNode]
   for procDef in body:
-    if procDef !~ ProcDef(_):
-      error "jclass expects a list of proc definitions", procDef
-    # Parse proc header
-    const
-      # important indexes in nnkProcDef children,
-      # see: https://nim-lang.org/docs/macros.html#statements-procedure-declaration
-      i_name = 0
-      i_params = 3
-      i_pragmas = 4
-      i_body = 6
-    # proc name must be a simple identifier, or backtick-quoted name
-    if procDef[i_name] !~ Ident(_) and
-      procDef[i_name] !~ AccQuoted(_):
-      error "jclass expects a proc name to be a simple identifier, or a backtick-quoted name", procDef[i_name]
-    if procDef[1] !~ Empty(): error "unexpected term rewriting pattern in jclass proc", procDef[1]
-    if procDef[2] !~ Empty(): error "unexpected generic type param in jclass proc", procDef[2]
-    # proc pragmas
-    var
-      procPragmas: seq[NimNode]
-      isDirect = false
-      procRegs = 0
-      procIns = 0
-      procOuts = 0
-    const
-      # TODO: shouldn't below also contain Final???
-      directMethodPragmas = toHashSet(["Static", "Private", "Constructor"])
-    if procDef[i_pragmas] =~ Pragma(_):
-      for p in procDef[i_pragmas]:
-        if p =~ Ident(_):
-          let capitalized = p.strVal.capitalizeAscii
-          procPragmas.add ident(capitalized)
-          if capitalized in directMethodPragmas:
-            isDirect = true
-        elif p =~ ExprColonExpr(Ident(_), IntLit(_)):
-          case p[0].strVal
-          of "regs": procRegs = p[1].intVal.int
-          of "ins":  procIns = p[1].intVal.int
-          of "outs": procOuts = p[1].intVal.int
-          else: error "expected one of: 'regs: N', 'ins: N', 'outs: N' or access pragmas", p[0]
-        else:
-          error "unexpected format of pragma in jclass proc", p
-    # proc return type
-    var ret: NimNode = newLit("V")
-    if procDef[i_params][0] !~ Empty():
-      ret = procDef[i_params][0].handleJavaType
-    # check & collect proc params
-    var params: seq[NimNode]
-    if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
-    if procDef[i_params].len == 2:
-      let rawParams = procDef[i_params][1]
-      if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
-      if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
-      for p in rawParams[0..^3]:
-        params.add p.handleJavaType
-    # check proc body
-    var pbody: seq[NimNode]
-    if procDef[i_body] =~ StmtList(_):
-      for stmt in procDef[i_body]:
+    let p = parseAClassProc(procDef)
+
+    var instrs: seq[NimNode]
+    if not p.native:
+      # check proc body
+      if p.body =~ Empty():
+        continue
+      if p.body !~ StmtList(_):
+        error "unexpected syntax of proc body", p.body
+      for stmt in p.body:
         case stmt.kind
         of nnkCall:
-          pbody.add stmt
+          instrs.add stmt
         of nnkCommand:
           var call = newTree(nnkCall)
           stmt.copyChildrenTo(call)
           call.copyLineInfo(stmt)
-          pbody.add call
+          instrs.add call
         of nnkIdent:
-          pbody.add newCall(stmt)
+          instrs.add newCall(stmt)
         else:
-          error "jclass expects proc body to contain only Android assembly instructions", stmt
-    elif procDef[i_body] =~ Empty():
-      discard
-    else:
-      error "unexpected syntax of jclass proc body", procDef[i_body]
+          error "expected proc body to contain only Android assembly instructions", stmt
 
     # Rewrite the procedure as an EncodedMethod object
     let
-      name = procDef[i_name].collectProcName
-      paramsTree = newTree(nnkBracket, params)
-      procAccessTree = newTree(nnkCurly, procPragmas)
-      regsTree = newLit(procRegs)
-      insTree = newLit(procIns)
-      outsTree = newLit(procOuts)
+      name = p.name.collectProcName
+      paramsTree = newTree(nnkBracket, p.params)
+      ret = p.ret
+      procAccessTree = newTree(nnkCurly, p.pragmas)
+      regsTree = newLit(p.regs)
+      insTree = newLit(p.ins)
+      outsTree = newLit(p.outs)
       codeTree =
-        if pbody.len > 0:
-          let instrs = newTree(nnkBracket, pbody)
+        if instrs.len > 0:
+          let instrsTree = newTree(nnkBracket, instrs)
           quote do:
             SomeCode(Code(
               registers: `regsTree`,
               ins: `insTree`,
               outs: `outsTree`,
-              instrs: @`instrs`))
+              instrs: @`instrsTree`))
         else:
           quote do:
             NoCode()
@@ -840,7 +755,7 @@ macro jclass*(header, body: untyped): untyped =
         code: `codeTree`)
     # echo enc.repr  # this prints Nim code - Thanks @disruptek on Nim chatroom for the hint!
     # echo enc.treeRepr
-    if isDirect:
+    if p.direct:
       directMethods.add enc
     else:
       virtualMethods.add enc
@@ -848,7 +763,8 @@ macro jclass*(header, body: untyped): untyped =
   # Render collected data into a ClassDef object
   let
     classTree = newLit(classString)
-    accessTree = newTree(nnkCurly, pragmas)
+    accessTree = newTree(nnkCurly, h.pragmas)
+    super = h.super
     superclassTree =
       if super =~ Empty():
         quote do:
@@ -858,7 +774,8 @@ macro jclass*(header, body: untyped): untyped =
           SomeType(`super`)
     directMethodsTree = newTree(nnkBracket, directMethods)
     virtualMethodsTree = newTree(nnkBracket, virtualMethods)
-  let classDef = quote do:
+  # TODO: also, create a `let` identifer for the class name
+  result = quote do:
     ClassDef(
       class: `classTree`,
       access: `accessTree`,
@@ -866,8 +783,124 @@ macro jclass*(header, body: untyped): untyped =
       class_data: ClassData(
         direct_methods: @`directMethodsTree`,
         virtual_methods: @`virtualMethodsTree`))
-  # echo classDef.repr
 
-  # TODO: also, create a `let` identifer for the class name
-  result = classDef
+
+
+type AClassHeaderInfo = tuple
+  super: NimNode         # nnkEmpty if no superclass declared
+  pragmas: seq[NimNode]  # pragmas, with first letter modified to uppercase
+  fullName: seq[string]  # Fully Qualified Class Name
+
+proc parseAClassHeader(header: NimNode): AClassHeaderInfo =
+  ## parseAClassHeader parses Java class header (class name & various modifiers)
+  ## specified in Nim-like syntax.
+  ## Example:
+  ##
+  ##     com.akavel.hello2.HelloActivity {.public.} of Activity
+  ##
+  ## corresponds to:
+  ##
+  ##     package com.akavel.hello2;
+  ##     public class HelloActivity extends Activity { ... }
+
+  # [com.foo.Bar {.public.}] of Activity
+  result.super = newEmptyNode()
+  var rest = header
+  if header =~ Infix(Ident("of"), [], []):
+    result.super = header[2]
+    rest = header[1]
+
+  # [com.foo.Bar] {.public.}
+  if rest =~ PragmaExpr(_):
+    if rest !~ PragmaExpr([], []):
+      error "encountered unexpected syntax (too many words)", rest
+    if rest !~ PragmaExpr([], Pragma(_)):
+      error "expected pragmas list", rest[1]
+    for p in rest[1]:
+      if p !~ Ident(_):
+        error "expected a simple pragma identifer", p
+      let x = ident(p.strVal.capitalizeAscii)
+      x.copyLineInfo(p)
+      result.pragmas.add x
+    rest = rest[0]
+
+  # com.foo.[Bar]
+  while rest =~ DotExpr(_):
+    # TODO: allow and handle "$" character in class names
+    if rest !~ DotExpr([], Ident(_)):
+      error "expected 2+ dot-separated simple identifiers", rest
+    result.fullName.add rest[1].strVal
+    rest = rest[0]
+
+  # [com.foo.]Bar
+  if rest !~ Ident(_):
+    error "expected dot-separated simple identifiers", rest
+  result.fullname.add rest.strVal
+  # After the processing above, fullName has unnatural, reversed order of segments; fix this
+  reverse(result.fullname)
+
+type AClassProcInfo = tuple
+  name: NimNode
+  pragmas: seq[NimNode]
+  direct, native: bool
+  regs, ins, outs: int
+  params: seq[NimNode]
+  ret: NimNode
+  body: NimNode
+
+proc parseAClassProc(procDef: NimNode): AClassProcInfo =
+  if procDef !~ ProcDef(_):
+    error "expected a proc definition", procDef
+  # Parse proc header
+  const
+    # important indexes in nnkProcDef children,
+    # see: https://nim-lang.org/docs/macros.html#statements-procedure-declaration
+    i_name = 0
+    i_params = 3
+    i_pragmas = 4
+    i_body = 6
+
+  # proc name must be a simple identifier, or backtick-quoted name
+  if procDef[i_name] !~ Ident(_) and procDef[i_name] !~ AccQuoted(_):
+    error "expected a proc name to be a simple identifier, or a backtick-quoted name", procDef[0]
+  result.name = procDef[i_name]
+
+  if procDef[1] !~ Empty():
+    error "unexpected term rewriting pattern", procDef[1]
+  if procDef[2] !~ Empty():
+    error "unexpected generic type param", procDef[2]
+  # TODO: shouldn't below also contain Final???
+  const directMethodPragmas = toHashSet(["Static", "Private", "Constructor"])
+  if procDef[i_pragmas] =~ Pragma(_):
+    for p in procDef[i_pragmas]:
+      if p =~ Ident(_):
+        let x = ident(p.strVal.capitalizeAscii)
+        x.copyLineInfo(p)
+        result.pragmas.add x
+        if x.strVal in directMethodPragmas:
+          result.direct = true
+        elif x.strVal == "Native":
+          result.native = true
+      elif p =~ ExprColonExpr(Ident(_), IntLit(_)):
+        case p[0].strVal
+        of "regs": result.regs = p[1].intVal.int
+        of "ins":  result.ins = p[1].intVal.int
+        of "outs": result.outs = p[1].intVal.int
+        else: error "expected one of: 'regs: N', 'ins: N', 'outs: N' or access pragmas", p[0]
+      else:
+        error "unexpected format of pragma", p
+  # proc return type
+  result.ret = newLit("V")  # 'void' by default
+  if procDef[i_params][0] !~ Empty():
+    result.ret = procDef[i_params][0].handleJavaType
+  # check & collect proc params
+  if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
+  if procDef[i_params].len == 2:
+    let rawParams = procDef[i_params][1]
+    if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
+    if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
+    for p in rawParams[0..^3]:
+      result.params.add p.handleJavaType
+  # copy proc body
+  result.body = procDef[i_body]
 

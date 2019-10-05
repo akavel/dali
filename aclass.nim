@@ -51,11 +51,12 @@ macro classes_dex*(body: untyped): untyped =
       let cl = aclass2Class(c[1], c[2])
       result.add(quote do:
         `dex`.classes.add(`cl`))
-    let stdout = bindSym"stdout"
-    let write = bindSym"write"
+    # let stdout = bindSym"stdout"
+    let writeFile = bindSym"writeFile"
     let render = bindSym"render"
     result.add(quote do:
-      `stdout`.`write`(`dex`.`render`))
+      `writeFile`("classes.dex", `dex`.`render`))
+      # `stdout`.`write`(`dex`.`render`))
 
 proc aclass2native(header, body: NimNode): seq[NimNode] =
   var h = parseAClassHeader(header)
