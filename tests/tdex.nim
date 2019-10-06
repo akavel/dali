@@ -1,7 +1,8 @@
 {.experimental: "codeReordering".}
 import unittest
 import strutils
-include dali
+include dali/dex
+import dali
 
 let hello_world_apk = strip_space"""
 .d .e .x 0A .0 .3 .5 00  6F 53 89 BC 1E 79 B2 4F
