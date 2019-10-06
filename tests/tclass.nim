@@ -1,27 +1,15 @@
 import unittest
 import dali
 
-let
+const
   Application = "Landroid/app/Application;"
   Activity = "Landroid/app/Activity;"
   Bundle = "Landroid/os/Bundle;"
-  View = "Landroid/view/View;"
   HelloAndroid = "Lcom/android/hello/HelloAndroid;"
 
-# macro dclass(header: untyped): untyped =
-#   ## TODO
-#   result = nnkStmtList.newTree()
-#   echo header.treeRepr
-#   echo "----------"
-
-# dumpTree SomeCode(Code(registers: 3))
-# dumpTree:
-#   proc foo() {.public, bar: 1, baz: 2.} =
-#     discard
-
+# TODO: test "hello_world.apk":
+#   # needs support for arrays, see tdex.nim
 # discard dclass hw {.public.}
-
-# discard dclass com.foo.Bar  # no pragmas
 
 discard dclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
@@ -38,8 +26,6 @@ discard dclass com.android.hello.HelloAndroid {.public.} of Activity:
     const_high16(0, 0x7f03)
     invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int))
     return_void()
-
-# TODO: test "hello_world.apk":
 
 test "bugsnag.apk":
   let c =
