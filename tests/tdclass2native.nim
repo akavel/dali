@@ -41,15 +41,20 @@ let jni_hello_code = dclass2native_string com.akavel.hello2.HelloActivity {.publ
 
 test "jni_hello.so code as string":
   let wantCode = """
-proc Java_com_akavel_hello2_HelloActivity_stringFromJNI*(jenv: JNIEnvPtr, jthis: jobject): jstring {.cdecl,exportc,dynlib.} =
+proc Java_com_akavel_hello2_HelloActivity_stringFromJNI*(jenv: JNIEnvPtr;
+    jthis: jobject): jstring {.cdecl, exportc, dynlib.} =
   return jenv.NewStringUTF(jenv, "Hello from Nim dclass :D")
-  """
+"""
   check trim(wantCode) == trim(jni_hello_code)
 
 proc trim(s: string): string =
   var x = s
   x.removePrefix
   x.removePrefix "["  # not sure why this shows up in NimNode.repr :/
+  x.removePrefix
+  x.removeSuffix {' '}
   x.removeSuffix
   x.removeSuffix "]"  # not sure why this shows up in NimNode.repr :/
-  return "\n" & x & "\n"
+  x.removeSuffix
+  return "\n" & x.replace(" ", "·").replace("\t", "¬").replace("\n", "¶\n") & "\n"
+

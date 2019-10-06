@@ -1,6 +1,7 @@
 {.experimental: "codeReordering".}
 import std/macros
 import strutils
+import sequtils
 import algorithm
 import sets
 
@@ -226,8 +227,8 @@ proc dclass2ClassDef(header, body: NimNode): NimNode =
     # Rewrite the procedure as an EncodedMethod object
     let
       name = p.name.collectProcName
-      paramsTree = newTree(nnkBracket, p.params)
-      ret = p.ret
+      paramsTree = newTree(nnkBracket, p.params[0..^1].map(handleJavaType))
+      ret = p.ret.handleJavaType
       procAccessTree = newTree(nnkCurly, p.pragmas)
       regsTree = newLit(p.regs)
       insTree = newLit(p.ins)
@@ -393,7 +394,7 @@ proc parseDClassProc(procDef: NimNode): DClassProcInfo =
   # proc return type
   result.ret = newLit("V")  # 'void' by default
   if procDef[i_params][0] !~ Empty():
-    result.ret = procDef[i_params][0].handleJavaType
+    result.ret = procDef[i_params][0]
   # check & collect proc params
   if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
   if procDef[i_params].len == 2:
@@ -401,7 +402,7 @@ proc parseDClassProc(procDef: NimNode): DClassProcInfo =
     if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
     if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
     for p in rawParams[0..^3]:
-      result.params.add p.handleJavaType
+      result.params.add p
   # copy proc body
   result.body = procDef[i_body]
 
