@@ -2,6 +2,8 @@ import macros
 import sequtils
 import strutils
 
+# TODO: how do I write tests for functions operating on NimNodes ??? :( https://forum.nim-lang.org/t/5261
+
 type
   MatchKind = enum
     mkConcrete, mkOne, mkAny,

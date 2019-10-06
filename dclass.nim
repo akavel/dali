@@ -3,8 +3,8 @@ import macros
 import strutils
 import algorithm
 import sets
-import src / dali
-import src / dali / macromatch
+import src/dali
+import src/dali/utils/macromatch
 import jni_wrapper
 
 # Goal sketch:

@@ -9,9 +9,9 @@ import hashes
 import algorithm
 import macros
 import patty
-import dali/sortedset
-import dali/blob
-import dali/macromatch
+import dali/utils/sortedset
+import dali/utils/blob
+import dali/utils/macromatch
 
 # NOTE(akavel): this must be early, to make sure it's used, as codeReordering fails to move it
 proc `<`(p1, p2: Prototype): bool =

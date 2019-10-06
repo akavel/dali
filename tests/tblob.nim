@@ -1,7 +1,7 @@
 {.experimental: "codeReordering".}
 import unittest
 import strutils
-import dali/blob
+import dali/utils/blob
 
 test "skip":
   var s: Blob
