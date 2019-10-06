@@ -107,6 +107,85 @@ proc handleJavaType(n: NimNode): NimNode =
 macro dclass*(header, body: untyped): untyped =
   dclass2ClassDef(header, body)
 
+# Goal sketch:
+#
+# let
+#   HelloActivity = jtype com.akavel.hello2.HelloActivity
+#   Activity = jtype android.app.Activity
+#   Bundle = jtype android.os.Bundle
+#   String = jtype java.lang.String
+# dex "hellomello.dex":
+#   dclass HelloActivity {.public.} of Activity:
+#     # LATER: automatic loadLibrary in `<clinit>`
+#     # LATER LATER: some syntax for constructor calling base class constructor
+#     var x: int   # Nim int
+#     proc onCreate(_: Bundle) {.dalvik, public, regs: 4, ...} =
+#       invoke_super(2, 3, jproto Activity.onCreate(Bundle))
+#       ...
+#     proc sampleNative(y: jint): String
+#       self.x = y
+#       return jstring("x = {}" % self.x)
+
+macro classes_dex*(body: untyped): untyped =
+  result = nnkStmtList.newTree()
+  # echo body.treeRepr
+
+  # Expecting a list of "dclass Foo {.public.} of Bar:" definitions
+  if body !~ StmtList(_):
+    error "classes_dex expects a list of 'dclass' definitions", body
+  for c in body:
+    if c !~ Command(Ident("dclass"), [], []):
+      error "expected 'dclass' keyword", c
+
+  when defined android:
+    for c in body:
+      result.add dclass2native(c[1], c[2])
+
+  when not defined android:
+    let dex = genSym()
+    let newDex = bindSym"newDex"
+    result.add(quote do:
+      let `dex` = `newDex`())
+    for c in body:
+      let cl = dclass2ClassDef(c[1], c[2])
+      result.add(quote do:
+        `dex`.classes.add(`cl`))
+    let stdout = bindSym"stdout"
+    let writeBuffer = bindSym"writeBuffer"
+    # let writeFile = bindSym"writeFile"
+    let render = bindSym"render"
+    result.add(quote do:
+      # Workaround for https://github.com/nim-lang/Nim/issues/12315
+      # (write & writeFile skip null bytes on Windows)
+      let tmp = `dex`.`render`
+      discard `stdout`.`writeBuffer`(tmp[0].unsafeAddr, tmp.len))
+      # `stdout`.`write`(`dex`.`render`))
+      # `writeFile`("classes.dex", `dex`.`render`))
+
+proc dclass2native(header, body: NimNode): seq[NimNode] =
+  var h = parseDClassHeader(header)
+  for procDef in body:
+    let p = parseDClassProc(procDef)
+    if not p.native:
+      continue
+    let
+      # TODO: handle '$' in class names
+      nameAST = ident("Java_" & h.fullName.join("_") & "_" & p.name.strVal)
+      bodyAST = p.body
+      jenv = ident("jenv")
+      jthis = ident("jthis")
+      # Note: below procAST is not complete yet at this
+      # phase, but it's a good starting point.
+      procAST = quote do:
+        proc `nameAST`*(`jenv`: JNIEnvPtr, `jthis`: jobject) {.cdecl,exportc,dynlib.} =
+          `bodyAST`
+    # Transplant the proc's returned type
+    procAST.params[0] = p.ret
+    # Append original proc's parameters to the procAST
+    for param in p.params:
+      procAST.params.add param
+    result.add procAST
+
 proc dclass2ClassDef(header, body: NimNode): NimNode =
   var h = parseDClassHeader(header)
 
