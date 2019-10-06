@@ -691,11 +691,11 @@ proc collectProcName*(n: NimNode): NimNode =
       buf.add it.strVal
     newLit(buf)
 
-macro jclass*(header, body: untyped): untyped =
-  aclass2Class(header, body)
+macro dclass*(header, body: untyped): untyped =
+  dclass2ClassDef(header, body)
 
-proc aclass2Class(header, body: NimNode): NimNode =
-  var h = parseAClassHeader(header)
+proc dclass2ClassDef(header, body: NimNode): NimNode =
+  var h = parseDClassHeader(header)
 
   # Translate the class name to a string understood by Java bytecode. Do it
   # here as it'll be needed below.
@@ -708,7 +708,7 @@ proc aclass2Class(header, body: NimNode): NimNode =
     directMethods: seq[NimNode]
     virtualMethods: seq[NimNode]
   for procDef in body:
-    let p = parseAClassProc(procDef)
+    let p = parseDClassProc(procDef)
 
     var instrs: seq[NimNode]
     if not p.native:
@@ -795,13 +795,13 @@ proc aclass2Class(header, body: NimNode): NimNode =
 
 
 
-type AClassHeaderInfo = tuple
+type DClassHeaderInfo = tuple
   super: NimNode         # nnkEmpty if no superclass declared
   pragmas: seq[NimNode]  # pragmas, with first letter modified to uppercase
   fullName: seq[string]  # Fully Qualified Class Name
 
-proc parseAClassHeader(header: NimNode): AClassHeaderInfo =
-  ## parseAClassHeader parses Java class header (class name & various modifiers)
+proc parseDClassHeader(header: NimNode): DClassHeaderInfo =
+  ## parseDClassHeader parses Java class header (class name & various modifiers)
   ## specified in Nim-like syntax.
   ## Example:
   ##
@@ -848,7 +848,7 @@ proc parseAClassHeader(header: NimNode): AClassHeaderInfo =
   # After the processing above, fullName has unnatural, reversed order of segments; fix this
   reverse(result.fullname)
 
-type AClassProcInfo = tuple
+type DClassProcInfo = tuple
   name: NimNode
   pragmas: seq[NimNode]
   direct, native: bool
@@ -857,7 +857,7 @@ type AClassProcInfo = tuple
   ret: NimNode
   body: NimNode
 
-proc parseAClassProc(procDef: NimNode): AClassProcInfo =
+proc parseDClassProc(procDef: NimNode): DClassProcInfo =
   if procDef !~ ProcDef(_):
     error "expected a proc definition", procDef
   # Parse proc header

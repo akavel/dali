@@ -8,7 +8,7 @@ let
   View = "Landroid/view/View;"
   HelloAndroid = "Lcom/android/hello/HelloAndroid;"
 
-# macro jclass(header: untyped): untyped =
+# macro dclass(header: untyped): untyped =
 #   ## TODO
 #   result = nnkStmtList.newTree()
 #   echo header.treeRepr
@@ -19,16 +19,16 @@ let
 #   proc foo() {.public, bar: 1, baz: 2.} =
 #     discard
 
-# discard jclass hw {.public.}
+# discard dclass hw {.public.}
 
-# discard jclass com.foo.Bar  # no pragmas
+# discard dclass com.foo.Bar  # no pragmas
 
-discard jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
+discard dclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
     invoke_direct 0, jproto Application.`<init>`()
     return_void
 
-discard jclass com.android.hello.HelloAndroid {.public.} of Activity:
+discard dclass com.android.hello.HelloAndroid {.public.} of Activity:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
     invoke_direct(0, jproto Activity.`<init>`())
     return_void()
@@ -43,7 +43,7 @@ discard jclass com.android.hello.HelloAndroid {.public.} of Activity:
 
 test "bugsnag.apk":
   let c =
-    jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
+    dclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
       proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
         invoke_direct(0, jproto Application.`<init>`())
         return_void()
@@ -81,7 +81,7 @@ test "bugsnag.apk":
 
 test "hello_android.apk":
   let c =
-    jclass com.android.hello.HelloAndroid {.public.} of Activity:
+    dclass com.android.hello.HelloAndroid {.public.} of Activity:
       proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
         invoke_direct(0, jproto Activity.`<init>`())
         return_void()

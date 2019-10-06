@@ -14,7 +14,7 @@ const
 
 var dex = newDex()
 dex.classes.add:
-  jclass com.akavel.hello.HelloActivity {.public.} of Activity:
+  dclass com.akavel.hello.HelloActivity {.public.} of Activity:
     proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
       invoke_direct(0, jproto Activity.`<init>`())
       return_void()

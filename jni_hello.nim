@@ -22,7 +22,7 @@ const
 var dex = newDex()
 
 dex.classes.add:
-  jclass com.akavel.hello2.HelloActivity {.public.} of Activity:
+  dclass com.akavel.hello2.HelloActivity {.public.} of Activity:
     proc `<clinit>`() {.static, constructor, regs:2, ins:0, outs:1.} =
       # System.loadLibrary("hello-mello")
       const_string(0, "hello-mello")

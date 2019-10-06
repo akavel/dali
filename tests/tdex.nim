@@ -194,7 +194,7 @@ test "synthesized bugsnag.apk (FIXME: except checksums) prettified with macros":
   dex.addStr """~~D8{"min-api":26,"version":"v0.1.14"}"""
 
   dex.classes.add:
-    jclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
+    dclass com.bugsnag.dexexample.BugsnagApp {.public.} of Application:
       proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
         invoke_direct(0, jproto Application.`<init>`())
         return_void()
@@ -335,7 +335,7 @@ test "synthesized hello_android.apk prettified with macros":
   dex.addTypeList(@["I"])
 
   dex.classes.add:
-    jclass com.android.hello.HelloAndroid {.public.} of Activity:
+    dclass com.android.hello.HelloAndroid {.public.} of Activity:
       proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
         invoke_direct 0, jproto Activity.`<init>`()
         return_void

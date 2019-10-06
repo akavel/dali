@@ -15,7 +15,7 @@ import jni_wrapper
 #   Bundle = jtype android.os.Bundle
 #   String = jtype java.lang.String
 # dex "hellomello.dex":
-#   aclass HelloActivity {.public.} of Activity:
+#   dclass HelloActivity {.public.} of Activity:
 #     # LATER: automatic loadLibrary in `<clinit>`
 #     # LATER LATER: some syntax for constructor calling base class constructor
 #     var x: int   # Nim int
@@ -31,16 +31,16 @@ macro classes_dex*(body: untyped): untyped =
   result = nnkStmtList.newTree()
   # echo body.treeRepr
 
-  # Expecting a list of "aclass Foo {.public.} of Bar:" definitions
+  # Expecting a list of "dclass Foo {.public.} of Bar:" definitions
   if body !~ StmtList(_):
-    error "classes_dex expects a list of 'aclass' definitions", body
+    error "classes_dex expects a list of 'dclass' definitions", body
   for c in body:
-    if c !~ Command(Ident("aclass"), [], []):
-      error "expected 'aclass' keyword", c
+    if c !~ Command(Ident("dclass"), [], []):
+      error "expected 'dclass' keyword", c
 
   when defined android:
     for c in body:
-      result.add aclass2native(c[1], c[2])
+      result.add dclass2native(c[1], c[2])
 
   when not defined android:
     let dex = genSym()
@@ -48,7 +48,7 @@ macro classes_dex*(body: untyped): untyped =
     result.add(quote do:
       let `dex` = `newDex`())
     for c in body:
-      let cl = aclass2Class(c[1], c[2])
+      let cl = dclass2ClassDef(c[1], c[2])
       result.add(quote do:
         `dex`.classes.add(`cl`))
     let stdout = bindSym"stdout"
@@ -63,10 +63,10 @@ macro classes_dex*(body: untyped): untyped =
       # `stdout`.`write`(`dex`.`render`))
       # `writeFile`("classes.dex", `dex`.`render`))
 
-proc aclass2native(header, body: NimNode): seq[NimNode] =
-  var h = parseAClassHeader(header)
+proc dclass2native(header, body: NimNode): seq[NimNode] =
+  var h = parseDClassHeader(header)
   for procDef in body:
-    let p = parseAClassProc(procDef)
+    let p = parseDClassProc(procDef)
     if not p.native:
       continue
     let
@@ -88,8 +88,8 @@ proc aclass2native(header, body: NimNode): seq[NimNode] =
       procAST.params.add param
     result.add procAST
 
-proc aclass2Class(header, body: NimNode): NimNode =
-  var h = parseAClassHeader(header)
+proc dclass2ClassDef(header, body: NimNode): NimNode =
+  var h = parseDClassHeader(header)
 
   # Translate the class name to a string understood by Java bytecode. Do it
   # here as it'll be needed below.
@@ -102,7 +102,7 @@ proc aclass2Class(header, body: NimNode): NimNode =
     directMethods: seq[NimNode]
     virtualMethods: seq[NimNode]
   for procDef in body:
-    let p = parseAClassProc(procDef)
+    let p = parseDClassProc(procDef)
 
     var instrs: seq[NimNode]
     if not p.native:
@@ -189,13 +189,13 @@ proc aclass2Class(header, body: NimNode): NimNode =
 
 
 
-type AClassHeaderInfo = tuple
+type DClassHeaderInfo = tuple
   super: NimNode         # nnkEmpty if no superclass declared
   pragmas: seq[NimNode]  # pragmas, with first letter modified to uppercase
   fullName: seq[string]  # Fully Qualified Class Name
 
-proc parseAClassHeader(header: NimNode): AClassHeaderInfo =
-  ## parseAClassHeader parses Java class header (class name & various modifiers)
+proc parseDClassHeader(header: NimNode): DClassHeaderInfo =
+  ## parseDClassHeader parses Java class header (class name & various modifiers)
   ## specified in Nim-like syntax.
   ## Example:
   ##
@@ -242,7 +242,7 @@ proc parseAClassHeader(header: NimNode): AClassHeaderInfo =
   # After the processing above, fullName has unnatural, reversed order of segments; fix this
   reverse(result.fullname)
 
-type AClassProcInfo = tuple
+type DClassProcInfo = tuple
   name: NimNode
   pragmas: seq[NimNode]
   direct, native: bool
@@ -251,7 +251,7 @@ type AClassProcInfo = tuple
   ret: NimNode
   body: NimNode
 
-proc parseAClassProc(procDef: NimNode): AClassProcInfo =
+proc parseDClassProc(procDef: NimNode): DClassProcInfo =
   if procDef !~ ProcDef(_):
     error "expected a proc definition", procDef
   # Parse proc header
@@ -355,7 +355,7 @@ let
 
 expandMacros:
   classes_dex:
-    aclass com.akavel.hello2.HelloActivity {.public.} of Activity:
+    dclass com.akavel.hello2.HelloActivity {.public.} of Activity:
       proc `<clinit>`() {.static, constructor, regs:2, ins:0, outs:1.} =
         # System.loadLibrary("hello-mello")
         const_string(0, "hello-mello")
@@ -383,7 +383,7 @@ expandMacros:
         # return
         return_void()
       proc stringFromJNI(): jstring {.public, native.} =
-        return jenv.NewStringUTF(jenv, "Hello from Nim aclass :D")
+        return jenv.NewStringUTF(jenv, "Hello from Nim dclass :D")
 
 # dumpTree:
 #   if foo =~ Ident([]):
