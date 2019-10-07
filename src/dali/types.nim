@@ -71,9 +71,13 @@ type
     # static_values: ?
   ClassData* = ref object
     # static_fields*: ?
-    # instance_fields*: ?
+    #TODO: add some tests for rendered instance_fields
+    instance_fields*: seq[EncodedField]
     direct_methods*: seq[EncodedMethod]
     virtual_methods*: seq[EncodedMethod]
+  EncodedField* = ref object
+    f*: Field
+    access*: set[Access]
   EncodedMethod* = ref object
     m*: Method
     access*: set[Access]

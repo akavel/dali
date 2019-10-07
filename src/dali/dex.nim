@@ -263,11 +263,11 @@ proc render*(dex: Dex): string =
     classDataOffsets.setAll(c.class, blob.pos, blob)
     let d = c.class_data
     blob.put_uleb128 0  # TODO: static_fields_size
-    blob.put_uleb128 0  # TODO: instance_fields_size
+    blob.put_uleb128 d.instance_fields.len.uint32
     blob.put_uleb128 d.direct_methods.len.uint32
     blob.put_uleb128 d.virtual_methods.len.uint32
     # TODO: static_fields
-    # TODO: instance_fields
+    dex.renderEncodedFields(blob, d.instance_fields)
     dex.renderEncodedMethods(blob, d.direct_methods, codeOffsets)
     dex.renderEncodedMethods(blob, d.virtual_methods, codeOffsets)
 
@@ -304,6 +304,8 @@ proc collect(dex: Dex) =
     if c.superclass.kind == MaybeTypeKind.SomeType:
       dex.addType(c.superclass.typ)
     let cd = c.class_data
+    for f in cd.instance_fields:
+      dex.addField(f.f)
     for dm in cd.direct_methods & cd.virtual_methods:
       dex.addMethod(dm.m)
       if dm.code.kind == MaybeCodeKind.SomeCode:
@@ -323,6 +325,15 @@ proc collect(dex: Dex) =
                 dex.addType(t)
               MethodXXXX(m):
                 dex.addMethod(m)
+
+proc renderEncodedFields(dex: Dex, blob: var Blob, fields: openArray[EncodedField]) =
+  var prev = 0
+  for f in fields:
+    let tupl = f.f.asTuple
+    let idx = dex.fields.search(tupl)
+    blob.put_uleb128 uint32(idx - prev)
+    prev = idx
+    blob.put_uleb128 f.access.toUint32
 
 proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: openArray[EncodedMethod], codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]) =
   var prev = 0
@@ -428,6 +439,8 @@ proc stringsAsAdded(dex: Dex): seq[string] =
   for s, added in dex.strings:
     result[added] = s
 
+func asTuple(f: Field): tuple[class: Type, name: string, typ: Type] =
+  return (class: f.class, name: f.name, typ: f.typ)
 func asTuple(m: Method): tuple[class: Type, name: string, proto: Prototype] =
   return (class: m.class, name: m.name, proto: m.prototype)
 
