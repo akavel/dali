@@ -56,6 +56,12 @@ expandMacros:
         return jenv.NewStringUTF(jenv, "Hello from Nim dclass :D")
 
 # dumpTree:
+#   var foo, bing: seq[int]
+#   var
+#     bar: seq[int] = @[1,2]
+#     baz = @[3,4]
+
+# dumpTree:
 #   if foo =~ Ident([]):
 #     while bar =~ Biz(_):
 #       discard
