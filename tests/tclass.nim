@@ -131,4 +131,45 @@ test "hello_android.apk":
     )
   )
 
+test "with NimSelf":
+  let c =
+    dclass com.akavel.HasSelf {.public, nimSelf.}:
+      proc `<init>`() {.public, constructor, regs:1, ins:1, outs:0.} =
+        return_void()
+  checkpoint c.repr
+  check c.equals ClassDef(
+    class: "Lcom/akavel/HasSelf;",
+    superclass: NoType(),
+    access: {Public},
+    class_data: ClassData(
+      instance_fields: @[
+        EncodedField(
+          f: Field(
+            class: "Lcom/akavel/HasSelf;",
+            name: "nimSelf",
+            typ: "J"),
+          access: {Private}),
+      ],
+      direct_methods: @[
+        EncodedMethod(
+          m: Method(
+            class: "Lcom/akavel/HasSelf;",
+            name: "<init>",
+            prototype: Prototype(ret: "V", params: @[]),
+          ),
+          access: {Public, Constructor},
+          code: SomeCode(Code(
+            registers: 1,
+            ins: 1,
+            outs: 0,
+            instrs: @[
+              return_void(),
+            ],
+          )),
+        ),
+      ],
+    )
+  )
+
+
 

@@ -262,9 +262,22 @@ proc dclass2ClassDef(header, body: NimNode): NimNode =
     else:
       virtualMethods.add enc
 
+  let classTree = newLit(classString)
+
+  # Add "nimSelf" field to the class if specified in pragmas.
+  # TODO: add it always when there are any native methods?
+  let instanceFieldsTree = newTree(nnkBracket)
+  if h.hasNimSelf:
+    instanceFieldsTree.add(quote do:
+      EncodedField(
+        f: Field(
+          class: `classTree`,
+          typ: "J",
+          name: "nimSelf"),
+        access: {Private}))
+
   # Render collected data into a ClassDef object
   let
-    classTree = newLit(classString)
     accessTree = newTree(nnkCurly, h.pragmas)
     super = h.super
     superclassTree =
@@ -283,6 +296,7 @@ proc dclass2ClassDef(header, body: NimNode): NimNode =
       access: `accessTree`,
       superclass: `superclassTree`,
       class_data: ClassData(
+        instance_fields: @`instanceFieldsTree`,
         direct_methods: @`directMethodsTree`,
         virtual_methods: @`virtualMethodsTree`))
 
@@ -291,6 +305,7 @@ proc dclass2ClassDef(header, body: NimNode): NimNode =
 type DClassHeaderInfo = tuple
   super: NimNode         # nnkEmpty if no superclass declared
   pragmas: seq[NimNode]  # pragmas, with first letter modified to uppercase
+  hasNimSelf: bool
   fullName: seq[string]  # Fully Qualified Class Name
 
 proc parseDClassHeader(header: NimNode): DClassHeaderInfo =
@@ -322,6 +337,9 @@ proc parseDClassHeader(header: NimNode): DClassHeaderInfo =
       if p !~ Ident(_):
         error "expected a simple pragma identifer", p
       let x = ident(p.strVal.capitalizeAscii)
+      if x.strVal.eqIdent "NimSelf":
+        result.hasNimSelf = true
+        continue
       x.copyLineInfo(p)
       result.pragmas.add x
     rest = rest[0]
