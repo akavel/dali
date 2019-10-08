@@ -151,17 +151,22 @@ macro classes_dex*(body: untyped): untyped =
       let cl = dclass2ClassDef(c[1], c[2])
       result.add(quote do:
         `dex`.classes.add(`cl`))
-    let stdout = bindSym"stdout"
-    let writeBuffer = bindSym"writeBuffer"
-    # let writeFile = bindSym"writeFile"
-    let render = bindSym"render"
+    let renderClassesDex = bindSym"renderClassesDex"
     result.add(quote do:
-      # Workaround for https://github.com/nim-lang/Nim/issues/12315
-      # (write & writeFile skip null bytes on Windows)
-      let tmp = `dex`.`render`
-      discard `stdout`.`writeBuffer`(tmp[0].unsafeAddr, tmp.len))
-      # `stdout`.`write`(`dex`.`render`))
-      # `writeFile`("classes.dex", `dex`.`render`))
+      `renderClassesDex`(`dex`))
+
+proc renderClassesDex(dex: Dex) =
+  ## Temporary workaround for https://github.com/nim-lang/Nim/issues/12315
+  ## (write & writeFile skip null bytes on Windows)
+  let buf = dex.render
+  var f: File
+  if f.open("classes.dex", fmWrite):
+    try:
+      f.writeBuffer(buf[0].unsafeAddr, buf.len)
+    finally:
+      close(f)
+  else:
+    raise newException(IOError, "cannot open: classes.dex")
 
 proc dclass2native(header, body: NimNode): seq[NimNode] =
   var h = parseDClassHeader(header)
