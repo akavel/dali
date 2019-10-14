@@ -78,15 +78,15 @@ proc typeLetter(fullType: string): string =
   ## typeLetter returns a one-letter code of a Java/Android primitive type,
   ## as represented in bytecode. Returns empty string if the input type is not known.
   case fullType
-  of "void": "V"
-  of "boolean": "Z"
-  of "byte": "B"
-  of "char": "C"
-  of "int": "I"
-  of "long": "J"
-  of "float": "F"
-  of "double": "D"
-  of "jshort": "S"
+  of "jvoid","void": "V"
+  of "jboolean","boolean": "Z"
+  of "jbyte","byte": "B"
+  of "jchar","char": "C"
+  of "jint","int": "I"
+  of "jlong","long": "J"
+  of "jfloat","float": "F"
+  of "jdouble","double": "D"
+  of "jshort","short": "S"
   else: ""
 
 proc handleJavaType(n: NimNode): NimNode =

@@ -74,7 +74,7 @@ classes_dex "dclass.dex":
       iget_wide(1, 3,
         Field(class:HelloActivity, typ:"J", name:"nimSelf"))
       # v0 = Long.toString(v1..2)
-      invoke_static(1, 2, jproto Long.toString(Long))
+      invoke_static(1, 2, jproto Long.toString(jlong))
       move_result_object(0)
       # return v0
       return_object(0)
