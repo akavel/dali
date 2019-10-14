@@ -223,6 +223,7 @@ proc render*(dex: Dex): string =
       if dm.code.kind == MaybeCodeKind.SomeCode:
         codeItems.inc()
         let code = dm.code.code
+        blob.pad32()
         codeOffsets[dm.m.asTuple] = blob.pos
         blob.put16 code.registers
         blob.put16 code.ins
