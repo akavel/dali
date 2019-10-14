@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.1"
+version       = "0.2.2"
 author        = "Mateusz Czapliński"
 description   = "Dalvik Assembler/Linker"
 license       = "AGPL-3.0"
