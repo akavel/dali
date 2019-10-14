@@ -32,7 +32,7 @@ let
 # TODO 2:
 #  - same as above, but steps 2+3 are implemented in stringFromJNI()
 
-classes_dex:
+classes_dex "dclass.dex":
   dclass com.akavel.hello2.HelloActivity {.public.} of Activity:
     # proc `<clinit>`() {.static, constructor, regs:2, ins:0, outs:1.} =
     #   # System.loadLibrary("hello-mello")

@@ -127,7 +127,7 @@ macro dclass*(header, body: untyped): untyped =
 #       self.x = y
 #       return jstring("x = {}" % self.x)
 
-macro classes_dex*(body: untyped): untyped =
+macro classes_dex*(filename: string, body: untyped): untyped =
   result = nnkStmtList.newTree()
   # echo body.treeRepr
 
@@ -151,16 +151,16 @@ macro classes_dex*(body: untyped): untyped =
       let cl = dclass2ClassDef(c[1], c[2])
       result.add(quote do:
         `dex`.classes.add(`cl`))
-    let renderClassesDex = bindSym"renderClassesDex"
+    let renderDex = bindSym"renderDex"
     result.add(quote do:
-      `renderClassesDex`(`dex`))
+      `renderDex`(`dex`, `filename`))
 
-proc renderClassesDex(dex: Dex) =
+proc renderDex(dex: Dex, filename: string) =
   ## Temporary workaround for https://github.com/nim-lang/Nim/issues/12315
   ## (write & writeFile skip null bytes on Windows)
   let buf = dex.render
   var f: File
-  if f.open("classes.dex", fmWrite):
+  if f.open(filename, fmWrite):
     try:
       f.writeBuffer(buf[0].unsafeAddr, buf.len)
     finally:
