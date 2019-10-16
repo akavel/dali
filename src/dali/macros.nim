@@ -189,7 +189,7 @@ proc dclass2native(header, body: NimNode): seq[NimNode] =
     procAST.params[0] = p.ret
     # Append original proc's parameters to the procAST
     for param in p.params:
-      procAST.params.add param
+      procAST.params.add newIdentDefs(param.name, param.typ)
     result.add procAST
 
 proc dclass2ClassDef(header, body: NimNode): NimNode =
@@ -232,7 +232,7 @@ proc dclass2ClassDef(header, body: NimNode): NimNode =
     # Rewrite the procedure as an EncodedMethod object
     let
       name = p.name.collectProcName
-      paramsTree = newTree(nnkBracket, p.params[0..^1].map(handleJavaType))
+      paramsTree = newTree(nnkBracket, p.params[0..^1].mapIt(it.typ.handleJavaType))
       ret = p.ret.handleJavaType
       procAccessTree = newTree(nnkCurly, p.pragmas)
       regsTree = newLit(p.regs)
@@ -369,7 +369,7 @@ type DClassProcInfo = tuple
   pragmas: seq[NimNode]
   direct, native: bool
   regs, ins, outs: int
-  params: seq[NimNode]
+  params: seq[tuple[name, typ: NimNode]]
   ret: NimNode
   body: NimNode
 
@@ -416,13 +416,14 @@ proc parseDClassProc(procDef: NimNode): DClassProcInfo =
   if procDef.params[0] !~ Empty():
     result.ret = procDef.params[0]
   # check & collect proc params
-  if procDef.params.len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef.params
-  if procDef.params.len == 2:
-    let rawParams = procDef.params[1]
-    if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
-    if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
-    for p in rawParams[0..^3]:
-      result.params.add p
+  result.params = extractParams(procDef)
   # copy proc body
   result.body = procDef.body
+
+proc extractParams(procDef: NimNode): seq[tuple[name, typ: NimNode]] =
+  for p in procDef.params[1..^1]:
+    if p[^2] =~ Empty(): error "missing type for param", p
+    if p[^1] !~ Empty(): error "default param values not supported", p[^1]
+    for name in p[0..^3]:
+      result.add (name, p[^2])
 

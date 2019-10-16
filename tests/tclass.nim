@@ -20,8 +20,8 @@ discard dclass com.android.hello.HelloAndroid {.public.} of Activity:
   proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
     invoke_direct(0, jproto Activity.`<init>`())
     return_void()
-  proc fooBar(Bundle, View, int)
-  proc onCreate(Bundle) {.public, regs:3, ins:2, outs:2.} =
+  proc fooBar(_: Bundle, _: View, _: int)
+  proc onCreate(_: Bundle) {.public, regs:3, ins:2, outs:2.} =
     invoke_super(1, 2, jproto Activity.onCreate(Bundle))
     const_high16(0, 0x7f03)
     invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int))
@@ -71,7 +71,7 @@ test "hello_android.apk":
       proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
         invoke_direct(0, jproto Activity.`<init>`())
         return_void()
-      proc onCreate(Bundle) {.public, regs:3, ins:2, outs:2.} =
+      proc onCreate(_: Bundle) {.public, regs:3, ins:2, outs:2.} =
         invoke_super(1, 2, jproto Activity.onCreate(Bundle))
         const_high16(0, 0x7f03)
         invoke_virtual(1, 0, jproto HelloAndroid.setContentView(int))

@@ -18,7 +18,7 @@ let jni_hello_code = dclass2native_string com.akavel.hello2.HelloActivity {.publ
     proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
       invoke_direct(0, jproto Activity.`<init>`())
       return_void()
-    proc onCreate(Bundle) {.public, regs:4, ins:2, outs:2.} =
+    proc onCreate(_: Bundle) {.public, regs:4, ins:2, outs:2.} =
       # ins: this, arg0
       # super.onCreate(arg0)
       invoke_super(2, 3, jproto Activity.onCreate(Bundle))

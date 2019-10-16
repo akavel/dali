@@ -340,7 +340,7 @@ test "synthesized hello_android.apk prettified with macros":
       proc `<init>`() {.public, constructor, regs:1, ins:1, outs:1.} =
         invoke_direct 0, jproto Activity.`<init>`()
         return_void
-      proc onCreate(Bundle) {.public, regs:3, ins:2, outs:2.} =
+      proc onCreate(_: Bundle) {.public, regs:3, ins:2, outs:2.} =
         invoke_super 1, 2, jproto Activity.onCreate(Bundle)
         const_high16 0, 0x7f03
         invoke_virtual 1, 0, jproto HelloAndroid.setContentView(int)
