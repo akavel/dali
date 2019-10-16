@@ -381,9 +381,6 @@ proc parseDClassProc(procDef: NimNode): DClassProcInfo =
     # important indexes in nnkProcDef children,
     # see: https://nim-lang.org/docs/macros.html#statements-procedure-declaration
     i_name = 0
-    i_params = 3
-    i_pragmas = 4
-    i_body = 6
 
   # proc name must be a simple identifier, or backtick-quoted name
   if procDef[i_name] !~ Ident(_) and procDef[i_name] !~ AccQuoted(_):
@@ -396,8 +393,8 @@ proc parseDClassProc(procDef: NimNode): DClassProcInfo =
     error "unexpected generic type param", procDef[2]
   # TODO: shouldn't below also contain Final???
   const directMethodPragmas = toHashSet(["Static", "Private", "Constructor"])
-  if procDef[i_pragmas] =~ Pragma(_):
-    for p in procDef[i_pragmas]:
+  if procDef.pragma =~ Pragma(_):
+    for p in procDef.pragma:
       if p =~ Ident(_):
         let x = ident(p.strVal.capitalizeAscii)
         x.copyLineInfo(p)
@@ -416,16 +413,16 @@ proc parseDClassProc(procDef: NimNode): DClassProcInfo =
         error "unexpected format of pragma", p
   # proc return type
   result.ret = newLit("V")  # 'void' by default
-  if procDef[i_params][0] !~ Empty():
-    result.ret = procDef[i_params][0]
+  if procDef.params[0] !~ Empty():
+    result.ret = procDef.params[0]
   # check & collect proc params
-  if procDef[i_params].len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef[i_params]
-  if procDef[i_params].len == 2:
-    let rawParams = procDef[i_params][1]
+  if procDef.params.len > 2: error "unexpected syntax of proc params (must be a list of type names)", procDef.params
+  if procDef.params.len == 2:
+    let rawParams = procDef.params[1]
     if rawParams[^1] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^1]
     if rawParams[^2] !~ Empty(): error "unexpected syntax of proc param (must be a name of a type)", rawParams[^2]
     for p in rawParams[0..^3]:
       result.params.add p
   # copy proc body
-  result.body = procDef[i_body]
+  result.body = procDef.body
 
