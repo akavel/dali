@@ -412,7 +412,7 @@ proc parseDClassProc(procDef: NimNode): DClassProcInfo =
       else:
         error "unexpected format of pragma", p
   # proc return type
-  result.ret = newLit("V")  # 'void' by default
+  result.ret = ident("void")  # 'void' by default
   if procDef.params[0] !~ Empty():
     result.ret = procDef.params[0]
   # check & collect proc params

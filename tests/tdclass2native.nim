@@ -7,7 +7,7 @@ import dali
 include dali/macros
 
 macro dclass2native_string(header, body: untyped): untyped =
-  newStrLitNode(dclass2native(header, body).repr)
+  newStrLitNode(newStmtList(dclass2native(header, body)).repr)
 
 let jni_hello_code = dclass2native_string com.akavel.hello2.HelloActivity {.public.} of Activity:
     proc `<clinit>`() {.static, constructor, regs:2, ins:0, outs:1.} =
@@ -38,12 +38,18 @@ let jni_hello_code = dclass2native_string com.akavel.hello2.HelloActivity {.publ
       return_void()
     proc stringFromJNI(): jstring {.public, native.} =
       return jenv.NewStringUTF(jenv, "Hello from Nim dclass :D")
+    proc nopVoid() {.public, native.} =
+      discard jenv.NewStringUTF(jenv, "nop")
 
 test "jni_hello.so code as string":
   let wantCode = """
 proc Java_com_akavel_hello2_HelloActivity_stringFromJNI*(jenv: JNIEnvPtr;
     jthis: jobject): jstring {.cdecl, exportc, dynlib.} =
   return jenv.NewStringUTF(jenv, "Hello from Nim dclass :D")
+
+proc Java_com_akavel_hello2_HelloActivity_nopVoid*(jenv: JNIEnvPtr; jthis: jobject): void {.
+    cdecl, exportc, dynlib.} =
+  discard jenv.NewStringUTF(jenv, "nop")
 """
   check trim(wantCode) == trim(jni_hello_code)
 
