@@ -1,11 +1,7 @@
 {.experimental: "codeReordering".}
-import macros
-import strutils
-import algorithm
-import sets
-import src/dali
-import src/dali/utils/macromatch
-import jni_wrapper
+# import macros
+import dali
+# import jni_wrapper
 
 # let
 #   HelloActivity = jtype com.akavel.hello2.HelloActivity
