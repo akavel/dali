@@ -205,7 +205,11 @@ proc render*(dex: Dex): string =
         blob.put32 dex.types.search(t).uint32
       NoType:
         blob.put32 NO_INDEX
-    blob.put32 0'u32      # TODO: interfaces_off
+    if c.interfaces.len > 0:
+      blob.put32 >>: slot
+      typeListOffsets.add(c.interfaces, slot)
+    else:
+      blob.put32 0'u32
     blob.put32 NO_INDEX   # TODO: source_file_idx
     blob.put32 0'u32      # TODO: annotations_off
     blob.put32 >>: slot
@@ -309,6 +313,8 @@ proc collect(dex: Dex) =
     dex.addType(c.class)
     if c.superclass.kind == MaybeTypeKind.SomeType:
       dex.addType(c.superclass.typ)
+    if c.interfaces.len > 0:
+      dex.addTypeList(c.interfaces)
     let cd = c.class_data
     if isnil cd:
       continue
