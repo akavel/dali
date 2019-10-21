@@ -23,6 +23,10 @@ variantp MaybeCode:
   SomeCode(code: Code)
   NoCode
 
+variantp EncodedValue:
+  EVArray(elems: seq[EncodedValue])
+  EVType(typ: Type)
+
 
 type
   Field* = ref object
@@ -64,7 +68,7 @@ type
     class*: Type
     access*: set[Access]
     superclass*: MaybeType
-    # interfaces: TypeList
+    interfaces*: TypeList
     # sourcefile: String
     # annotations: ?
     class_data*: ClassData
@@ -81,6 +85,7 @@ type
   EncodedMethod* = ref object
     m*: Method
     access*: set[Access]
+    annotations*: seq[AnnotationItem]
     code*: MaybeCode
   Access* = enum
     Public = 0x1
@@ -96,6 +101,17 @@ type
     Annotation = 0x2000
     Enum = 0x4000
     Constructor = 0x1_0000
+  AnnotationItem* = tuple
+    visibility: Visibility
+    encoded_annotation: EncodedAnnotation
+  Visibility* = enum
+    VisSystem = 0x02
+  EncodedAnnotation* = ref object
+    typ*: Type
+    elems*: seq[AnnotationElement]
+  AnnotationElement* = ref object
+    name*: string
+    value*: EncodedValue
 
   NotImplementedYetError* = object of CatchableError
   ConsistencyError* = object of CatchableError

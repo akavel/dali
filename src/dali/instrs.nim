@@ -33,6 +33,8 @@ proc invoke_virtual*(regC: uint4, m: Method): Instr =
 proc invoke_virtual*(regC: uint4, regD: uint4, m: Method): Instr =
   return newInvoke2(0x6e, regC, regD, m)
 
+proc invoke_super*(regC: uint4, m: Method): Instr =
+  return newInvoke1(0x6f, regC, m)
 proc invoke_super*(regC: uint4, regD: uint4, m: Method): Instr =
   return newInvoke2(0x6f, regC, regD, m)
 

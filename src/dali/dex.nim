@@ -4,6 +4,7 @@ import strutils
 import sequtils
 import std/sha1
 import tables
+import algorithm
 
 import patty
 
@@ -219,6 +220,8 @@ proc render*(dex: Dex): string =
     codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]
   for c in dex.classes:
     let cd = c.class_data
+    if isnil cd:
+      continue
     for dm in cd.direct_methods & cd.virtual_methods:
       if dm.code.kind == MaybeCodeKind.SomeCode:
         codeItems.inc()
@@ -262,7 +265,9 @@ proc render*(dex: Dex): string =
   sections.add (0x2000'u16, blob.pos, dex.classes.len)
   for c in dex.classes:
     classDataOffsets.setAll(c.class, blob.pos, blob)
-    let d = c.class_data
+    var d = c.class_data
+    if isnil d:
+      d = ClassData()
     blob.put_uleb128 0  # TODO: static_fields_size
     blob.put_uleb128 d.instance_fields.len.uint32
     blob.put_uleb128 d.direct_methods.len.uint32
@@ -305,6 +310,8 @@ proc collect(dex: Dex) =
     if c.superclass.kind == MaybeTypeKind.SomeType:
       dex.addType(c.superclass.typ)
     let cd = c.class_data
+    if isnil cd:
+      continue
     for f in cd.instance_fields:
       dex.addField(f.f)
     for dm in cd.direct_methods & cd.virtual_methods:
@@ -336,7 +343,9 @@ proc renderEncodedFields(dex: Dex, blob: var Blob, fields: openArray[EncodedFiel
     prev = idx
     blob.put_uleb128 f.access.toUint32
 
-proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: openArray[EncodedMethod], codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]) =
+proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: var openArray[EncodedMethod], codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]) =
+  methods.sort func(a, b: EncodedMethod): int =
+    result = cmp(a.m.asTuple, b.m.asTuple)
   var prev = 0
   for m in methods:
     let tupl = m.m.asTuple
