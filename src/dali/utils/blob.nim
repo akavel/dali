@@ -102,7 +102,11 @@ proc pos*(b: var Blob): uint32 {.inline.} =
 
 
 proc add*[T](slots: var Slots32[T], key: T, val: Slot32) =
-  slots.TSlots32[:T].mgetOrPut(key, newSeq[Slot32]()).add(val)
+  slots.madd(key) = val
+proc madd*[T](slots: var Slots32[T], key: T): var Slot32 =
+  var s = slots.TSlots32[:T].mgetOrPut(key, newSeq[Slot32]()).addr
+  s[].add(0.Slot32)
+  s[][^1]
 
 proc setAll*[T](slots: Slots32[T], key: T, val: uint32, blob: var Blob) =
   if not slots.TSlots32[:T].contains(key):

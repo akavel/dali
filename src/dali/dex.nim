@@ -169,8 +169,7 @@ proc render*(dex: Dex): string =
   for p in dex.prototypes:
     blob.put32 stringIds[dex.strings[p.descriptor]].uint32
     blob.put32 dex.types.search(p.ret).uint32
-    blob.put32 >>: slot
-    typeListOffsets.add(p.params, slot)
+    blob.put32 >> typeListOffsets.madd(p.params)
     # echo p.ret, " ", p.params
 
   #-- Render field IDs
@@ -206,14 +205,12 @@ proc render*(dex: Dex): string =
       NoType:
         blob.put32 NO_INDEX
     if c.interfaces.len > 0:
-      blob.put32 >>: slot
-      typeListOffsets.add(c.interfaces, slot)
+      blob.put32 >> typeListOffsets.madd(c.interfaces)
     else:
       blob.put32 0'u32
     blob.put32 NO_INDEX   # TODO: source_file_idx
     blob.put32 0'u32      # TODO: annotations_off
-    blob.put32 >>: slot
-    classDataOffsets.add(c.class, slot)
+    blob.put32 >> classDataOffsets.madd(c.class)
     blob.put32 0'u32      # TODO: static_values
 
   #-- Render code items
