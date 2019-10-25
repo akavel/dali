@@ -322,6 +322,11 @@ proc collect(dex: Dex) =
       dex.addField(f.f)
     for em in cd.direct_methods & cd.virtual_methods:
       dex.addMethod(em.m)
+      for a in em.annotations:
+        dex.addType(a.encoded_annotation.typ)
+        for el in a.encoded_annotation.elems:
+          dex.addStr(el.name)
+          dex.addEncValue(el.value)
       if em.code.kind == MaybeCodeKind.SomeCode:
         for instr in em.code.code.instrs:
           for arg in instr.args:
@@ -393,6 +398,14 @@ proc renderInstrs(dex: Dex, blob: var Blob, instrs: openArray[Instr], stringIds:
         MethodXXXX(v):
           blob.put16 dex.methods.search((v.class, v.name, v.prototype)).uint16
 
+
+proc addEncValue(dex: Dex, v: EncodedValue) =
+  match v:
+    EVArray(elems):
+      for e in elems:
+        dex.addEncValue(e)
+    EVType(typ):
+      dex.addType(typ)
 
 proc addField(dex: Dex, f: Field) =
   dex.addType(f.class)
