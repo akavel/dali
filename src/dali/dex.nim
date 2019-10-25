@@ -66,10 +66,10 @@ type
     prototypes: SortedSet[Prototype]
     # NOTE: fields must have no duplicates, TODO: and be sorted by:
     # (class type ID, field name's string ID, field's type ID)
-    fields: SortedSet[tuple[class: Type, name: string, typ: Type]]
+    fields: SortedSet[FieldTuple]
     # NOTE: methods must have no duplicates, TODO: and be sorted by:
     # (class type ID, name's string ID, prototype's proto ID)
-    methods: SortedSet[tuple[class: Type, name: string, proto: Prototype]]
+    methods: SortedSet[MethodTuple]
     classes*: seq[ClassDef]
 
 
@@ -221,7 +221,7 @@ proc render*(dex: Dex): string =
   blob[slots.dataOff] = dataStart
   var
     codeItems = 0
-    codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]
+    codeOffsets: Table[MethodTuple, uint32]
   for c in dex.classes:
     let cd = c.class_data
     if isnil cd:
@@ -354,7 +354,7 @@ proc renderEncodedFields(dex: Dex, blob: var Blob, fields: openArray[EncodedFiel
     prev = idx
     blob.put_uleb128 f.access.toUint32
 
-proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: var openArray[EncodedMethod], codeOffsets: Table[tuple[class: Type, name: string, proto: Prototype], uint32]) =
+proc renderEncodedMethods(dex: Dex, blob: var Blob, methods: var openArray[EncodedMethod], codeOffsets: Table[MethodTuple, uint32]) =
   methods.sort func(a, b: EncodedMethod): int =
     result = cmp(a.m.asTuple, b.m.asTuple)
   var prev = 0
@@ -468,10 +468,21 @@ proc stringsAsAdded(dex: Dex): seq[string] =
   for s, added in dex.strings:
     result[added] = s
 
-func asTuple(f: Field): tuple[class: Type, name: string, typ: Type] =
+func asTuple(f: Field): FieldTuple =
   return (class: f.class, name: f.name, typ: f.typ)
-func asTuple(m: Method): tuple[class: Type, name: string, proto: Prototype] =
+func asTuple(m: Method): MethodTuple =
   return (class: m.class, name: m.name, proto: m.prototype)
+
+type
+  FieldTuple = tuple
+    class: Type
+    name: string
+    typ: Type
+  MethodTuple = tuple
+    class: Type
+    name: string
+    proto: Prototype
+
 
 proc adler32(s: string): uint32 =
   # https://en.wikipedia.org/wiki/Adler-32
