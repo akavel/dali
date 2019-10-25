@@ -320,10 +320,10 @@ proc collect(dex: Dex) =
       continue
     for f in cd.instance_fields:
       dex.addField(f.f)
-    for dm in cd.direct_methods & cd.virtual_methods:
-      dex.addMethod(dm.m)
-      if dm.code.kind == MaybeCodeKind.SomeCode:
-        for instr in dm.code.code.instrs:
+    for em in cd.direct_methods & cd.virtual_methods:
+      dex.addMethod(em.m)
+      if em.code.kind == MaybeCodeKind.SomeCode:
+        for instr in em.code.code.instrs:
           for arg in instr.args:
             match arg:
               RawX(_): discard
