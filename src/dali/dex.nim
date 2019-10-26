@@ -319,6 +319,7 @@ proc render*(dex: Dex): string =
     if isnil cd: continue
     for i, em in cd.direct_methods & cd.virtual_methods:
       if em.annotations.len == 0: continue
+      methodAnnotationSetsOffsets.setAll(em.m.asTuple, blob.pos, blob)
       blob.put32 em.annotations.len.uint32
       blob.put32 >> methodAnnotationsOffsets.madd((em.m.asTuple, i))
   if methodAnnotationsOffsets.len > 0:
@@ -327,7 +328,8 @@ proc render*(dex: Dex): string =
   for c in dex.classes:
     let cd = c.class_data
     if isnil cd: continue
-    for em in cd.direct_methods & cd.virtual_methods:
+    for i, em in cd.direct_methods & cd.virtual_methods:
+      methodAnnotationsOffsets.setAll((em.m.asTuple, i), blob.pos, blob)
       for a in em.annotations:
         blob.putc a.visibility.ord.chr
         let ea = a.encoded_annotation
