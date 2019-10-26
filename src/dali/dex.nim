@@ -294,14 +294,22 @@ proc render*(dex: Dex): string =
     sections.add (0x2006'u16, blob.pos, annotationDataOffsets.len)
   var methodAnnotationSetsOffsets: Slots32[MethodTuple]
   for c in dex.classes:
+    if c.class notin annotationDataOffsets: continue
     annotationDataOffsets.setAll(c.class, blob.pos, blob)
     let cd = c.class_data
     if isnil cd: continue
+    blob.put32 0  # TODO: class_annotations_off
+    blob.put32 0  # TODO: fields_size
+    blob.put32 >>: nMethodsSlot
+    var nMethods: uint32
+    blob.put32 0  # TODO: annotated_parameters_size
     for em in cd.direct_methods & cd.virtual_methods:
       if em.annotations.len == 0: continue
       let t = em.m.asTuple
       blob.put32 uint32(dex.methods.search t)
       blob.put32 >> methodAnnotationSetsOffsets.madd(t)
+      nMethods.inc
+    blob[nMethodsSlot] = nMethods
   if methodAnnotationSetsOffsets.len > 0:
     blob.pad32()
     sections.add (0x1003'u16, blob.pos, methodAnnotationSetsOffsets.len)

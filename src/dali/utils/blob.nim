@@ -115,4 +115,5 @@ proc setAll*[T](slots: Slots32[T], key: T, val: uint32, blob: var Blob) =
     blob.set(slot, val)
 
 proc len*[T](slots: Slots32[T]): int = slots.TSlots32[:T].len
+proc contains*[T](slots: Slots32[T], key: T): bool = slots.TSlots32[:T].contains(key)
 
