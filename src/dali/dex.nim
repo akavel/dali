@@ -195,6 +195,7 @@ proc render*(dex: Dex): string =
   sections.add (0x0006'u16, blob.pos, dex.classes.len)
   blob[slots.classDefsOff] = blob.pos
   var classDataOffsets: Slots32[Type]
+  var annotationDataOffsets: Slots32[Type]
   const NO_INDEX = 0xffff_ffff'u32
   for c in dex.classes:
     blob.put32 dex.types.search(c.class).uint32
@@ -209,7 +210,16 @@ proc render*(dex: Dex): string =
     else:
       blob.put32 0'u32
     blob.put32 NO_INDEX   # TODO: source_file_idx
-    blob.put32 0'u32      # TODO: annotations_off
+    var hasAnnotations = false
+    if (let cd = c.class_data; not isnil cd):
+      for em in cd.direct_methods & cd.virtual_methods:
+        if em.annotations.len > 0:
+          hasAnnotations = true
+          break
+    if hasAnnotations:
+      blob.put32 >> annotationDataOffsets.madd(c.class)
+    else:
+      blob.put32 0'u32
     blob.put32 >> classDataOffsets.madd(c.class)
     blob.put32 0'u32      # TODO: static_values
 
@@ -278,6 +288,47 @@ proc render*(dex: Dex): string =
     dex.renderEncodedMethods(blob, d.direct_methods, codeOffsets)
     dex.renderEncodedMethods(blob, d.virtual_methods, codeOffsets)
 
+  #-- Render annotations data
+  if annotationDataOffsets.len > 0:
+    blob.pad32()
+    sections.add (0x2006'u16, blob.pos, annotationDataOffsets.len)
+  var methodAnnotationSetsOffsets: Slots32[MethodTuple]
+  for c in dex.classes:
+    annotationDataOffsets[c.class].setAll(blob.pos)
+    let cd = c.class_data
+    if isnil cd: continue
+    for em in cd.direct_methods & cd.virtual_methods:
+      if em.annotations.len == 0: continue
+      let t = em.m.asTuple
+      blob.put32 uint32(dex.methods.search t)
+      blob.put32 >> methodAnnotationSetsOffsets.madd(t)
+  if methodAnnotationSetsOffsets.len > 0:
+    blob.pad32()
+    sections.add (0x1003'u16, blob.pos, methodAnnotationSetsOffsets.len)
+  var methodAnnotationsOffsets: Slots32[tuple[MethodTuple, int]]
+  for c in dex.classes:
+    let cd = c.class_data
+    if isnil cd: continue
+    for i, em in cd.direct_methods & cd.virtual_methods:
+      if em.annotations.len == 0: continue
+      blob.put32 em.annotations.len.uint32
+      blob.put32 >> methodAnnotationsOffsets.madd((em.m.asTuple, i))
+  if methodAnnotationsOffsets.len > 0:
+    # TODO: [LATER] other kinds of annotations
+    sections.add (0x2004'u16, blob.pos, methodAnnotationsOffsets.len)
+  for c in dex.classes:
+    let cd = c.class_data
+    if isnil cd: continue
+    for em in cd.direct_methods & cd.virtual_methods:
+      for a in em.annotations:
+        blob.putc a.visibility.ord.uint8
+        let ea = a.encoded_annotation
+        blob.put_uleb128 dex.types.search(ea.typ).uint32
+        blob.put_uleb128 ea.elems.len.uint32
+        for el in ea.elems:
+          blob.put_uleb128 stringIds[dex.strings[el.name]]
+          dex.renderEncodedValue(blob, el.value)
+
   #-- Render map_list
   blob.pad32()
   sections.add (0x1000'u16, blob.pos, 1)
@@ -341,6 +392,35 @@ proc collect(dex: Dex) =
                 dex.addType(t)
               MethodXXXX(m):
                 dex.addMethod(m)
+
+proc renderEncodedValue(dex: Dex, blob: var Blob, v: EncodedValue) =
+  match v:
+    EVType(typ):
+      let s = dex.types.search(typ).uint32.evUint
+      blob.putc chr(s.len.uint8.shl 5 or 0x18)
+      blob.puts s
+    EVArray(elems):
+      blob.putc chr(0x1c)
+      for el in elems:
+        renderEncodedValue(dex, blob, el)
+
+func evUint(v: uint32): string =
+  ## evUint returns v marshalled in format useful for
+  ## EncodedValue. It is marshalled as low-endian, with
+  ## any trailing '\0' bytes stripped.
+  func byt(v: uint32, i: int): string =
+    ## byt returns the i-th byte of v, counting from 0 for
+    ## the least significant byte.
+    chr(v shr (8 shl i) and 0xff)
+  case v
+  of 0..0xff:
+    v.byt(0)
+  of 0x100..0xffff:
+    v.byt(0) & v.byt(1)
+  of 0x10000..0xffffff:
+    v.byt(0) & v.byt(1) & v.byt(2)
+  of 0x1000000..0xffffffff:
+    v.byt(0) & v.byt(1) & v.byt(2) & v.byt(3)
 
 proc renderEncodedFields(dex: Dex, blob: var Blob, fields: openArray[EncodedField]) =
   var prev = 0
