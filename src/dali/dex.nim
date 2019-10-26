@@ -397,12 +397,18 @@ proc renderEncodedValue(dex: Dex, blob: var Blob, v: EncodedValue) =
   match v:
     EVType(typ):
       let s = dex.types.search(typ).uint32.evUint
-      blob.putc chr(s.len.uint8.shl 5 or 0x18)
+      blob.putc evHdr(0x18, s.len.uint8-1)
       blob.puts s
     EVArray(elems):
-      blob.putc chr(0x1c)
+      blob.putc evHdr(0x1c, 0)
+      blob.put_uleb128 elems.len.uint32
       for el in elems:
         renderEncodedValue(dex, blob, el)
+
+func evHdr(typ: uint8, arg: uint8): char =
+  ## evHdr formats typ & arg as an EncodedValue's internal
+  ## "header byte"
+  chr(arg shl 5 or typ)
 
 func evUint(v: uint32): string =
   ## evUint returns v marshalled in format useful for
@@ -411,7 +417,7 @@ func evUint(v: uint32): string =
   func byt(v: uint32, i: int): string =
     ## byt returns the i-th byte of v, counting from 0 for
     ## the least significant byte.
-    $chr(v shr (8 shl i) and 0xff)
+    $chr(v shr (i*8) and 0xff)
   case v
   of 0..0xff:
     v.byt(0)

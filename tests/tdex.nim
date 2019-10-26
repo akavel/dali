@@ -4,6 +4,25 @@ import strutils
 include dali/dex
 import dali
 
+test "renderEncodedValue":
+  let dex = newDex()
+  dex.types.incl("Ldalvik/annotation/Throws;")
+  dex.types.incl("Ljava/lang/Throwable;")
+  var blob: Blob
+  dex.renderEncodedValue(blob, EVArray(@[EVType("Ljava/lang/Throwable;")]))
+  let want = strip_space"""
+  1c 01 18 01
+  """.dehexify
+  check blob.string.dumpHex == want.dumpHex
+
+test "evUint":
+  check evUint(0).toHex == strip_space"00"
+  check evUint(1).toHex == strip_space"01"
+  check evUint(0xff).toHex == strip_space"FF"
+  check evUint(0x100).toHex == strip_space"0001"
+  check evUint(0x102).toHex == strip_space"0201"
+  check evUint(0x01020304).toHex == strip_space"04030201"
+
 let hello_world_apk = strip_space"""
 .d .e .x 0A .0 .3 .5 00  6F 53 89 BC 1E 79 B2 4F
 1F 9C 09 66 15 23 2D 3B  56 65 32 C3 B5 81 B4 5A
