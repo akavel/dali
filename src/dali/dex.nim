@@ -233,12 +233,12 @@ proc render*(dex: Dex): string =
     let cd = c.class_data
     if isnil cd:
       continue
-    for dm in cd.direct_methods & cd.virtual_methods:
-      if dm.code.kind == MaybeCodeKind.SomeCode:
+    for em in cd.direct_methods & cd.virtual_methods:
+      if em.code.kind == MaybeCodeKind.SomeCode:
         codeItems.inc()
-        let code = dm.code.code
+        let code = em.code.code
         blob.pad32()
-        codeOffsets[dm.m.asTuple] = blob.pos
+        codeOffsets[em.m.asTuple] = blob.pos
         blob.put16 code.registers
         blob.put16 code.ins
         blob.put16 code.outs
