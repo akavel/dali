@@ -294,7 +294,7 @@ proc render*(dex: Dex): string =
     sections.add (0x2006'u16, blob.pos, annotationDataOffsets.len)
   var methodAnnotationSetsOffsets: Slots32[MethodTuple]
   for c in dex.classes:
-    annotationDataOffsets[c.class].setAll(blob.pos)
+    annotationDataOffsets.setAll(c.class, blob.pos, blob)
     let cd = c.class_data
     if isnil cd: continue
     for em in cd.direct_methods & cd.virtual_methods:
@@ -305,7 +305,7 @@ proc render*(dex: Dex): string =
   if methodAnnotationSetsOffsets.len > 0:
     blob.pad32()
     sections.add (0x1003'u16, blob.pos, methodAnnotationSetsOffsets.len)
-  var methodAnnotationsOffsets: Slots32[tuple[MethodTuple, int]]
+  var methodAnnotationsOffsets: Slots32[tuple[m: MethodTuple, i: int]]
   for c in dex.classes:
     let cd = c.class_data
     if isnil cd: continue
@@ -321,12 +321,12 @@ proc render*(dex: Dex): string =
     if isnil cd: continue
     for em in cd.direct_methods & cd.virtual_methods:
       for a in em.annotations:
-        blob.putc a.visibility.ord.uint8
+        blob.putc a.visibility.ord.chr
         let ea = a.encoded_annotation
         blob.put_uleb128 dex.types.search(ea.typ).uint32
         blob.put_uleb128 ea.elems.len.uint32
         for el in ea.elems:
-          blob.put_uleb128 stringIds[dex.strings[el.name]]
+          blob.put_uleb128 stringIds[dex.strings[el.name]].uint32
           dex.renderEncodedValue(blob, el.value)
 
   #-- Render map_list
@@ -411,7 +411,7 @@ func evUint(v: uint32): string =
   func byt(v: uint32, i: int): string =
     ## byt returns the i-th byte of v, counting from 0 for
     ## the least significant byte.
-    chr(v shr (8 shl i) and 0xff)
+    $chr(v shr (8 shl i) and 0xff)
   case v
   of 0..0xff:
     v.byt(0)
@@ -419,7 +419,7 @@ func evUint(v: uint32): string =
     v.byt(0) & v.byt(1)
   of 0x10000..0xffffff:
     v.byt(0) & v.byt(1) & v.byt(2)
-  of 0x1000000..0xffffffff:
+  of 0x1000000..0xffffffff'u32:
     v.byt(0) & v.byt(1) & v.byt(2) & v.byt(3)
 
 proc renderEncodedFields(dex: Dex, blob: var Blob, fields: openArray[EncodedField]) =

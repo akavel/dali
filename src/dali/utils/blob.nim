@@ -114,3 +114,5 @@ proc setAll*[T](slots: Slots32[T], key: T, val: uint32, blob: var Blob) =
   for slot in slots.TSlots32[:T][key]:
     blob.set(slot, val)
 
+proc len*[T](slots: Slots32[T]): int = slots.TSlots32[:T].len
+
