@@ -33,7 +33,7 @@ let
 test "long prototype syntax":
   let p = jproto HelloActivity.setContentView(View, int) -> String
   checkpoint p.repr
-  check p.equals Method(
+  check p == Method(
     class: HelloActivity,
     name: "setContentView",
     prototype: Prototype(ret: String, params: @[View, "I"]))
@@ -41,7 +41,7 @@ test "long prototype syntax":
 test "short prototype syntax":
   let p = jproto HelloActivity.foo()
   checkpoint p.repr
-  check p.equals Method(
+  check p == Method(
     class: HelloActivity,
     name: "foo",
     prototype: Prototype(ret: "V", params: @[]))
@@ -49,7 +49,7 @@ test "short prototype syntax":
 test "constructor":
   let p = jproto HelloActivity.`<init>`()
   checkpoint p.repr
-  check p.equals Method(
+  check p == Method(
     class: HelloActivity,
     name: "<init>",
     prototype: Prototype(ret: "V", params: @[]))
