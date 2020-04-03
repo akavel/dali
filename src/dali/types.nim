@@ -1,5 +1,6 @@
 {.experimental: "codeReordering".}
 import hashes
+import options
 
 import patty
 
@@ -14,10 +15,6 @@ variantp Arg:  # Argument of an instruction of Dalvik bytecode
   StringXXXX(string16: String)
   TypeXXXX(type16: Type)
   MethodXXXX(method16: Method)
-
-variantp MaybeType:
-  SomeType(typ: Type)
-  NoType
 
 variantp EncodedValue:
   EVArray(elems: seq[EncodedValue])
@@ -63,7 +60,7 @@ type
   ClassDef* = ref object
     class*: Type
     access*: set[Access]
-    superclass*: MaybeType
+    superclass*: Option[Type]
     interfaces*: TypeList
     # sourcefile: String
     # annotations: ?

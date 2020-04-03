@@ -1,10 +1,11 @@
 {.experimental: "codeReordering".}
+import algorithm
 import critbits
-import strutils
+import options
 import sequtils
 import std/sha1
+import strutils
 import tables
-import algorithm
 
 import patty
 
@@ -200,11 +201,10 @@ proc render*(dex: Dex): string =
   for c in dex.classes:
     blob.put32 dex.types.search(c.class).uint32
     blob.put32 c.access.uint32
-    match c.superclass:
-      SomeType(t):
-        blob.put32 dex.types.search(t).uint32
-      NoType:
-        blob.put32 NO_INDEX
+    if c.superclass.isSome:
+      blob.put32 dex.types.search(c.superclass.get).uint32
+    else:
+      blob.put32 NO_INDEX
     if c.interfaces.len > 0:
       blob.put32 >> typeListOffsets.madd(c.interfaces)
     else:
@@ -369,8 +369,8 @@ proc collect(dex: Dex) =
   # (types, prototypes/signatures, fields, methods)
   for c in dex.classes:
     dex.addType(c.class)
-    if c.superclass.kind == MaybeTypeKind.SomeType:
-      dex.addType(c.superclass.typ)
+    if c.superclass.isSome:
+      dex.addType(c.superclass.get)
     if c.interfaces.len > 0:
       dex.addTypeList(c.interfaces)
     let cd = c.class_data

@@ -1,9 +1,10 @@
 {.experimental: "codeReordering".}
-import std/macros
-import strutils
-import sequtils
 import algorithm
+import std/macros
+import options
+import sequtils
 import sets
+import strutils
 
 import dali/utils/macromatch
 
@@ -288,10 +289,10 @@ proc dclass2ClassDef(header, body: NimNode): NimNode =
     superclassTree =
       if super =~ Empty():
         quote do:
-          NoType()
+          none(Type)
       else:
         quote do:
-          SomeType(`super`)
+          some(`super`)
     directMethodsTree = newTree(nnkBracket, directMethods)
     virtualMethodsTree = newTree(nnkBracket, virtualMethods)
   # TODO: also, create a `let` identifer for the class name

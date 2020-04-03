@@ -71,7 +71,7 @@ test "synthesized hello_world.apk":
   dex.classes.add(ClassDef(
     class: "Lhw;",
     access: {Public},
-    superclass: SomeType("Ljava/lang/Object;"),
+    superclass: some("Ljava/lang/Object;"),
     class_data: ClassData(
       direct_methods: @[
         EncodedMethod(
@@ -108,7 +108,7 @@ test "synthesized hello_world.apk prettified with macros":
   dex.classes.add(ClassDef(
     class: "Lhw;",
     access: {Public},
-    superclass: SomeType("Ljava/lang/Object;"),
+    superclass: some("Ljava/lang/Object;"),
     class_data: ClassData(
       direct_methods: @[
         EncodedMethod(
@@ -170,7 +170,7 @@ test "synthesized bugsnag.apk (FIXME: except checksums)":
   dex.classes.add(ClassDef(
     class: "Lcom/bugsnag/dexexample/BugsnagApp;",
     access: {Public}, # TODO
-    superclass: SomeType("Landroid/app/Application;"),
+    superclass: some("Landroid/app/Application;"),
     class_data: ClassData(
       direct_methods: @[
         EncodedMethod(
@@ -283,7 +283,7 @@ test "synthesized hello_android.apk":
   dex.classes.add(ClassDef(
     class: "Lcom/android/hello/HelloAndroid;",
     access: {Public},
-    superclass: SomeType("Landroid/app/Activity;"),
+    superclass: some("Landroid/app/Activity;"),
     class_data: ClassData(
       direct_methods: @[
         EncodedMethod(

@@ -1,5 +1,6 @@
 import unittest
 import dali
+import options
 
 const
   Application = "Landroid/app/Application;"
@@ -37,7 +38,7 @@ test "bugsnag.apk":
   check c.equals ClassDef(
     class: "Lcom/bugsnag/dexexample/BugsnagApp;",
     access: {Public}, # TODO
-    superclass: SomeType("Landroid/app/Application;"),
+    superclass: some("Landroid/app/Application;"),
     class_data: ClassData(
       direct_methods: @[
         EncodedMethod(
@@ -80,7 +81,7 @@ test "hello_android.apk":
   check c.equals ClassDef(
     class: "Lcom/android/hello/HelloAndroid;",
     access: {Public},
-    superclass: SomeType("Landroid/app/Activity;"),
+    superclass: some("Landroid/app/Activity;"),
     class_data: ClassData(
       direct_methods: @[
         EncodedMethod(
@@ -139,7 +140,7 @@ test "with NimSelf":
   checkpoint c.repr
   check c.equals ClassDef(
     class: "Lcom/akavel/HasSelf;",
-    superclass: NoType(),
+    superclass: none(Type),
     access: {Public},
     class_data: ClassData(
       instance_fields: @[
