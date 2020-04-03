@@ -83,7 +83,7 @@ test "synthesized hello_world.apk":
               params: @["[Ljava/lang/String;"]),
           ),
           access: {Public, Static},
-          code: SomeCode(Code(
+          code: Code(
             registers: 2,
             ins: 1,
             outs: 2,
@@ -93,7 +93,7 @@ test "synthesized hello_world.apk":
               invoke_virtual(0, 1, Method(class: "Ljava/io/PrintStream;", name: "println",
                 prototype: Prototype(ret: "V", params: @["Ljava/lang/String;"]))),
               return_void(),
-            ]))
+            ])
         )
       ]
     )
@@ -120,7 +120,7 @@ test "synthesized hello_world.apk prettified with macros":
               params: @["[Ljava/lang/String;"]),
           ),
           access: {Public, Static},
-          code: SomeCode(Code(
+          code: Code(
             registers: 2,
             ins: 1,
             outs: 2,
@@ -129,7 +129,7 @@ test "synthesized hello_world.apk prettified with macros":
               const_string(1, "Hello World!"),
               invoke_virtual(0, 1, jproto PrintStream.println(String)),
               return_void(),
-            ]))
+            ])
         )
       ]
     )
@@ -183,7 +183,7 @@ test "synthesized bugsnag.apk (FIXME: except checksums)":
             ),
           ),
           access: {Public, Constructor},
-          code: SomeCode(Code(
+          code: Code(
             registers: 1,
             ins: 1,
             outs: 1,
@@ -192,7 +192,7 @@ test "synthesized bugsnag.apk (FIXME: except checksums)":
                 prototype: Prototype(ret: "V", params: @[]))),
               return_void(),
             ],
-          )),
+          ),
         )
       ]
     )
@@ -293,7 +293,7 @@ test "synthesized hello_android.apk":
             prototype: Prototype(ret: "V", params: @[]),
           ),
           access: {Public, Constructor},
-          code: SomeCode(Code(
+          code: Code(
             registers: 1,
             ins: 1,
             outs: 1,
@@ -302,7 +302,7 @@ test "synthesized hello_android.apk":
                 prototype: Prototype(ret: "V", params: @[]))),
               return_void(),
             ],
-          )),
+          ),
         ),
       ],
       virtual_methods: @[
@@ -316,7 +316,7 @@ test "synthesized hello_android.apk":
             ),
           ),
           access: {Public},
-          code: SomeCode(Code(
+          code: Code(
             registers: 3,
             ins: 2,
             outs: 2,
@@ -328,7 +328,7 @@ test "synthesized hello_android.apk":
                 prototype: Prototype(ret: "V", params: @["I"]))),
               return_void(),
             ],
-          )),
+          ),
         ),
       ],
     )

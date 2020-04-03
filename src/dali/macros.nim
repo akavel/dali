@@ -242,14 +242,14 @@ proc dclass2ClassDef(header, body: NimNode): NimNode =
         if instrs.len > 0:
           let instrsTree = newTree(nnkBracket, instrs)
           quote do:
-            SomeCode(Code(
+            Code(
               registers: `regsTree`,
               ins: `insTree`,
               outs: `outsTree`,
-              instrs: @`instrsTree`))
+              instrs: @`instrsTree`)
         else:
           quote do:
-            NoCode()
+            nil
     let enc = quote do:
       EncodedMethod(
         m: Method(

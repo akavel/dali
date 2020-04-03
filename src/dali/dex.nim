@@ -234,9 +234,9 @@ proc render*(dex: Dex): string =
     if isnil cd:
       continue
     for em in cd.direct_methods & cd.virtual_methods:
-      if em.code.kind == MaybeCodeKind.SomeCode:
+      if em.code != nil:
         codeItems.inc()
-        let code = em.code.code
+        let code = em.code
         blob.pad32()
         codeOffsets[em.m.asTuple] = blob.pos
         blob.put16 code.registers
@@ -385,8 +385,8 @@ proc collect(dex: Dex) =
         for el in a.encoded_annotation.elems:
           dex.addStr(el.name)
           dex.addEncValue(el.value)
-      if em.code.kind == MaybeCodeKind.SomeCode:
-        for instr in em.code.code.instrs:
+      if em.code != nil:
+        for instr in em.code.instrs:
           for arg in instr.args:
             match arg:
               RawX(_): discard

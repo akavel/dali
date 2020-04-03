@@ -19,10 +19,6 @@ variantp MaybeType:
   SomeType(typ: Type)
   NoType
 
-variantp MaybeCode:
-  SomeCode(code: Code)
-  NoCode
-
 variantp EncodedValue:
   EVArray(elems: seq[EncodedValue])
   EVType(typ: Type)
@@ -55,7 +51,7 @@ type
   Instr* = ref object
     opcode*: uint8
     args*: seq[Arg]
-  Code* = ref object
+  Code* = ref object  # "yes nil"
     registers*: uint16
     ins*: uint16
     outs*: uint16 # "the number of words of outgoing argument space required by this code for method invocation"
@@ -86,7 +82,7 @@ type
     m*: Method
     access*: set[Access]
     annotations*: seq[AnnotationItem]
-    code*: MaybeCode
+    code*: Code
   Access* = enum
     Public = 0x1
     Private = 0x2
@@ -136,9 +132,7 @@ func equals*(a, b: Arg): bool =
 func equals*(a, b: Instr): bool =
   a.opcode == b.opcode and a.args.equals(b.args)
 func equals*(a, b: Code): bool =
-  a.registers == b.registers and a.ins == b.ins and a.outs == b.outs and a.instrs.equals(b.instrs)
-func equals*(a, b: MaybeCode): bool =
-  a.kind == b.kind and (a.kind == MaybeCodeKind.NoCode or a.code.equals(b.code))
+  (a == nil and b == nil) or (a.registers == b.registers and a.ins == b.ins and a.outs == b.outs and a.instrs.equals(b.instrs))
 func equals*(a, b: EncodedMethod): bool =
   a.m.equals(b.m) and a.access == b.access and a.code.equals(b.code)
 func equals*(a, b: ClassData): bool =

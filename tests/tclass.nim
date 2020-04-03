@@ -50,7 +50,7 @@ test "bugsnag.apk":
             ),
           ),
           access: {Public, Constructor},
-          code: SomeCode(Code(
+          code: Code(
             registers: 1,
             ins: 1,
             outs: 1,
@@ -59,7 +59,7 @@ test "bugsnag.apk":
                 prototype: Prototype(ret: "V", params: @[]))),
               return_void(),
             ],
-          )),
+          ),
         )
       ]
     )
@@ -90,7 +90,7 @@ test "hello_android.apk":
             prototype: Prototype(ret: "V", params: @[]),
           ),
           access: {Public, Constructor},
-          code: SomeCode(Code(
+          code: Code(
             registers: 1,
             ins: 1,
             outs: 1,
@@ -99,7 +99,7 @@ test "hello_android.apk":
                 prototype: Prototype(ret: "V", params: @[]))),
               return_void(),
             ],
-          )),
+          ),
         ),
       ],
       virtual_methods: @[
@@ -113,7 +113,7 @@ test "hello_android.apk":
             ),
           ),
           access: {Public},
-          code: SomeCode(Code(
+          code: Code(
             registers: 3,
             ins: 2,
             outs: 2,
@@ -125,7 +125,7 @@ test "hello_android.apk":
                 prototype: Prototype(ret: "V", params: @["I"]))),
               return_void(),
             ],
-          )),
+          ),
         ),
       ],
     )
@@ -158,14 +158,14 @@ test "with NimSelf":
             prototype: Prototype(ret: "V", params: @[]),
           ),
           access: {Public, Constructor},
-          code: SomeCode(Code(
+          code: Code(
             registers: 1,
             ins: 1,
             outs: 0,
             instrs: @[
               return_void(),
             ],
-          )),
+          ),
         ),
       ],
     )
