@@ -22,17 +22,17 @@ variantp EncodedValue:
 
 
 type
-  Field* = ref object
+  Field* = object
     class*: Type
     typ*: Type
     name*: String
   Type* = String
   String* = string
-  Method* = ref object
+  Method* = object
     class*: Type
     prototype*: Prototype  # a.k.a. method signature
     name*: String
-  Prototype* = ref object
+  Prototype* = object
     ret*: Type
     params*: TypeList
   TypeList* = seq[Type]
@@ -45,10 +45,10 @@ func equals*(a, b: Prototype): bool =
   a.ret == b.ret and a.params == b.params
 
 type
-  Instr* = ref object
+  Instr* = object
     opcode*: uint8
     args*: seq[Arg]
-  Code* = ref object  # "yes nil"
+  Code* = ref object  # NOTE: nil is OK here
     registers*: uint16
     ins*: uint16
     outs*: uint16 # "the number of words of outgoing argument space required by this code for method invocation"
@@ -57,7 +57,7 @@ type
     instrs*: seq[Instr]
 
 type
-  ClassDef* = ref object
+  ClassDef* = object
     class*: Type
     access*: set[Access]
     superclass*: Option[Type]
@@ -66,16 +66,16 @@ type
     # annotations: ?
     class_data*: ClassData
     # static_values: ?
-  ClassData* = ref object
+  ClassData* = ref object  # NOTE: nil is OK here
     # static_fields*: ?
     #TODO: add some tests for rendered instance_fields
     instance_fields*: seq[EncodedField]
     direct_methods*: seq[EncodedMethod]
     virtual_methods*: seq[EncodedMethod]
-  EncodedField* = ref object
+  EncodedField* = object
     f*: Field
     access*: set[Access]
-  EncodedMethod* = ref object
+  EncodedMethod* = object
     m*: Method
     access*: set[Access]
     annotations*: seq[AnnotationItem]
@@ -99,10 +99,10 @@ type
     encoded_annotation: EncodedAnnotation
   Visibility* = enum
     VisSystem = 0x02
-  EncodedAnnotation* = ref object
+  EncodedAnnotation* = object
     typ*: Type
     elems*: seq[AnnotationElement]
-  AnnotationElement* = ref object
+  AnnotationElement* = object
     name*: string
     value*: EncodedValue
 
