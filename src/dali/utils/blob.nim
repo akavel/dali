@@ -12,10 +12,12 @@ type
   TSlots32[T] = Table[T, seq[Slot32]]
 
 proc skip*(b: var Blob, n: int) {.inline.} =
-  let pos = b.string.len
-  b.string.setLen(pos + n)
-  for i in pos ..< b.string.len:
-    b.string[i] = chr(0)
+  var s = b.string
+  let pos = s.len
+  s.setLen(pos + n)
+  for i in pos ..< s.len:
+    s[i] = chr(0)
+  b = s.Blob
 
 template `>>:`*(slot32: Slot32, slot: untyped): untyped =
   let slot = slot32
@@ -48,7 +50,11 @@ proc puts*(b: var Blob, v: string) =
   var s = b.string
   let pos = s.len
   s.setLen(pos + v.len)
-  copyMem(addr(s[pos]), cstring(v), v.len)
+  when nimvm:
+    for i, c in v:
+      s[pos+i] = c
+  else:
+    copyMem(addr(s[pos]), cstring(v), v.len)
   b = s.Blob
 
 proc putc*(b: var Blob, v: char) {.inline.} =
