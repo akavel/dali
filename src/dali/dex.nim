@@ -1,6 +1,5 @@
 {.experimental: "codeReordering".}
 import algorithm
-import critbits
 import options
 import sequtils
 import std/sha1
@@ -8,6 +7,7 @@ import strutils
 import tables
 
 import patty
+import sorta  # workarkound for critibits not working at comptime: https://github.com/nim-lang/nim/issues/14339
 
 import dali/utils/blob
 import dali/utils/sortedset
@@ -54,12 +54,13 @@ converter toUint32[T: enum](s: set[T]): uint32 =
 
 proc newDex*(): Dex =
   new(result)
+  result.strings = initSortedTable[string, int]()
 
 type
   Dex* = ref object
     # Note: below fields are generally ordered from simplest to more complex
     # (in order of dependency)
-    strings: CritBitTree[int]  # value: order of addition
+    strings: SortedTable[string, int]  # value: order of addition
     types: SortedSet[string]
     typeLists: seq[seq[Type]]
     # NOTE: prototypes must have no duplicates, TODO: and be sorted by:
@@ -544,7 +545,7 @@ proc addType(dex: Dex, t: Type) =
 proc addStr(dex: Dex, s: string) =
   if s.contains({'\x00', '\x80'..'\xFF'}):
     raise newException(NotImplementedYetError, "strings with 0x00 or 0x80..0xFF bytes are not yet supported")
-  discard dex.strings.containsOrIncl(s, dex.strings.len)
+  discard dex.strings.hasKeyOrPut(s, dex.strings.len)
   # "This list must be sorted by string contents, using UTF-16 code point
   # values (not in a locale-sensitive manner), and it must not contain any
   # duplicate entries." [dex-format] <- I think this is guaranteed by UTF-8 + CritBitTree type

@@ -11,3 +11,4 @@ srcDir        = "src"
 
 requires "nim >= 1.0.0"
 requires "patty 0.3.3"
+requires "sorta 0.2.0"
