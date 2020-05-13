@@ -16,10 +16,10 @@ macro jproto*(prototype: untyped): untyped =
   ##
   ##   let HelloWorld = "Lcom/hello/HelloWorld;"
   ##   let String = "Ljava/lang/String;"
-  ##   jproc HelloWorld.hello(String, int): String
-  ##   jproc HelloWorld.`<init>`()
-  ##   # NOTE: jproc argument must not be parenthesized; the following does not work unfortunately:
-  ##   # jproc(HelloWorld.hello(String, int): String)
+  ##   jproto HelloWorld.hello(String, int) -> String
+  ##   jproto HelloWorld.`<init>`()
+  ##   # NOTE: jproto argument must not be parenthesized; the following does not work unfortunately:
+  ##   # jproto(HelloWorld.hello(String, int) -> String)
   ##
   ## TODO: support Java array types, i.e. int[], int[][], etc.
   # echo proto.treeRepr
