@@ -36,5 +36,6 @@ static:
       ]
     )
   ))
-  writeFile("q_comptime.dex", dex.render)
+  let dat = dex.render
+  # writeFile("q_comptime.dex", dat)
 

@@ -355,7 +355,15 @@ proc render*(dex: Dex): string =
   blob[slots.dataSize] = blob.pos - dataStart  # FIXME: round to 64?
   blob[slots.fileSize] = blob.pos
   #-- Fill checksums
-  let sha1 = secureHash(blob.string.substr(0x20)).Sha1Digest
+  # let sha1 = secureHash(blob.string.substr(0x20)).Sha1Digest
+  let tmp01 = blob.string
+  let tmp02 = tmp01.substr(0x20)
+  when defined(comptime02):
+    if true: return
+  let tmp03 = secureHash(tmp02)
+  if true: return
+  let tmp04 = tmp03.Sha1Digest
+  let sha1 = tmp04
   for i in 0 ..< 20:
     blob.string[0x0c + i] = sha1[i].char
   blob[slots.adlerSum] = adler32(blob.string.substr(0x0c))
