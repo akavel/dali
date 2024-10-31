@@ -97,6 +97,28 @@ impl Dex {
         blob.write(&self.methods.len().to_u32().unwrap().to_le_bytes());
         blob.write(&[0u8; 4]); // FIXME: method_ids_off slot32
         blob.write(&self.classes.len().to_u32().unwrap().to_le_bytes());
+        blob.write(&[0u8; 4]); // FIXME: class_defs_off slot32
+        blob.write(&[0u8; 4]); // FIXME: data_size slot32
+        blob.write(&[0u8; 4]); // FIXME: data_off slot32
+
+        //-- Partially render string_ids
+        // We preallocate space for the list of string offsets. We cannot fill it yet, as its
+        // contents will depend on the size of the other segments.
+        //FIXME: sections.add (0x0001'u16, blob.pos, dex.strings.len)
+        //FIXME: blob[slots.stringIdsOff] = blob.pos
+        for i in 0..self.strings.len() {
+            blob.write(&[0u8; 4]); // FIXME: string_offs[i] slot32
+        }
+
+        //-- Render typeIDs.
+        //FIXME: sections.add (0x0002'u16, blob.pos, dex.types.len)
+        //FIXME: blob[slots.typeIdsOff] = blob.pos
+        let string_ids = self.strings_ordering();
+        // self.types are already stored sorted, same as self.strings, so we don't need
+        // to sort again by type IDs
+        for t in &self.types {
+            blob.write(&string_ids.get(&self.strings[t]).unwrap().to_le_bytes());
+        }
 
         blob
     }
@@ -146,6 +168,14 @@ impl Dex {
         // duplicate entries." [dex-format]
         let n: u32 = self.strings.len().try_into().unwrap();
         self.strings.entry(s.clone()).or_insert(n);
+    }
+
+    fn strings_ordering(&self) -> BTreeMap<u32, u32> {
+        let mut ordering = BTreeMap::new();
+        for (i, added) in self.strings.values().enumerate() {
+            ordering.insert(*added, i.try_into().unwrap());
+        }
+        ordering
     }
 }
 
