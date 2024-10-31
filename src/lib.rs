@@ -145,6 +145,16 @@ impl Dex {
             blob.write_u32::<LE>(*string_ids.get(&self.strings[&f.name]).unwrap());
         }
 
+        //-- Render method IDs
+        //FIXME: sections.add (0x0005'u16, blob.pos, dex.methods.len)
+        //FIXME: if dex.methods.len > 0:
+        //FIXME:   blob[slots.methodIdsOff] = blob.pos
+        for m in &self.methods {
+            blob.write_u16::<LE>(self.types.rank(&m.class).to_u16().unwrap());
+            blob.write_u16::<LE>(self.prototypes.rank(&m.prototype).to_u16().unwrap());
+            blob.write_u32::<LE>(*string_ids.get(&self.strings[&m.name]).unwrap());
+        }
+
         blob
     }
 
