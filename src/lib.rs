@@ -137,6 +137,22 @@ impl Dex {
             blob.write(&[0u8; 4]); // FIXME: type_list_offs[i] slot32
         }
 
+        //-- Render field IDs
+        if self.fields.len() > 0 {
+            //FIXME: sections.add (0x0004'u16, blob.pos, dex.fields.len)
+            //FIXME: blob[slots.fieldIdsOff] = blob.pos
+        }
+        for f in &self.fields {
+            blob.write(&self.types.rank(&f.class).to_u16().unwrap().to_le_bytes());
+            blob.write(&self.types.rank(&f.class).to_u16().unwrap().to_le_bytes());
+            blob.write(
+                &string_ids
+                    .get(&self.strings[&f.name])
+                    .unwrap()
+                    .to_le_bytes(),
+            );
+        }
+
         blob
     }
 
