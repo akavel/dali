@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
 
 use enumflags2::{bitflags, BitFlags};
@@ -12,6 +12,7 @@ mod instrs;
 pub struct Dex {
     // TODO[LATER]: use interned strings instead of String
     strings: BTreeMap<String, u32>, // value: order of addition
+    types: BTreeSet<String>,
     classes: Vec<ClassDef>,
 }
 
@@ -77,6 +78,8 @@ impl Dex {
         blob.write(&0u32.to_le_bytes()); // link_off
         blob.write(&[0u8; 4]); // FIXME: map_offset slot32
         blob.write(&self.strings.len().to_u32().unwrap().to_le_bytes());
+        blob.write(&[0u8; 4]); // FIXME: string_ids_offs slot32
+        blob.write(&self.types.len().to_u32().unwrap().to_le_bytes());
 
         blob
     }
@@ -114,7 +117,7 @@ impl Dex {
 
     fn add_type(&mut self, t: &Type) {
         self.add_str(t);
-        // FIXME: self.types.insert(t);
+        self.types.insert(t.clone());
     }
 
     fn add_str(&mut self, s: &String) {
