@@ -19,6 +19,7 @@ name = "dali"
 version = "0.1.0"
 dependencies = [
  "enumflags2",
+ "indexset",
  "itertools",
  "num",
  "pretty-hex",
@@ -56,6 +57,24 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "ftree"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "241f9dd9089e67c0b269989e9f884b12a61f68fc07ea8a4be6af8ee164e1abf7"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "indexset"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6279c421b4feea3fb8e07ea6bd0934b38b641f6601d5f6677062fad15272ed57"
+dependencies = [
+ "ftree",
 ]
 
 [[package]]

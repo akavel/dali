@@ -1,7 +1,8 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::io::Write;
 
 use enumflags2::{bitflags, BitFlags};
+use indexset::BTreeSet;
 use num::ToPrimitive;
 
 mod types;
@@ -118,6 +119,22 @@ impl Dex {
         // to sort again by type IDs
         for t in &self.types {
             blob.write(&string_ids.get(&self.strings[t]).unwrap().to_le_bytes());
+        }
+
+        //-- Partially render proto IDs.
+        // We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
+        // segments inbetween.
+        //FIXME: sections.add (0x0003'u16, blob.pos, dex.prototypes.len)
+        //FIXME: blob[slots.protoIdsOff] = blob.pos
+        for p in &self.prototypes {
+            blob.write(
+                &string_ids
+                    .get(&self.strings[&p.descriptor()])
+                    .unwrap()
+                    .to_le_bytes(),
+            );
+            blob.write(&self.types.rank(&p.ret).to_u32().unwrap().to_le_bytes());
+            blob.write(&[0u8; 4]); // FIXME: type_list_offs[i] slot32
         }
 
         blob
