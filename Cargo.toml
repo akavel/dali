@@ -5,7 +5,9 @@ edition = "2021"
 
 [dependencies]
 enumflags2 = { version = "0.7.10", features = ["std"] }
+u4 = "0.1.2"
 
 [dev-dependencies]
 itertools = "0.13.0"
+pretty-hex = "0.4.1"
 pretty_assertions = "1.4.1"

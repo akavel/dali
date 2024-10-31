@@ -1,80 +1,88 @@
 use enumflags2::{bitflags, BitFlags};
 
-#[bitflags]
-#[repr(u32)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum Access {
-    Public = 0x1,
-    Private = 0x2,
-    Protected = 0x4,
-    Static = 0x8,
-    Final = 0x10,
-    Synchronized = 0x20,
-    Varargs = 0x80,
-    Native = 0x100,
-    Interface = 0x200,
-    Abstract = 0x400,
-    Annotation = 0x2000,
-    Enum = 0x4000,
-    Constructor = 0x1_0000,
+mod types;
+pub use types::*;
+mod instrs;
+
+#[derive(Default)]
+pub struct Dex {
+    pub classes: Vec<ClassDef>,
 }
 
+impl Dex {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn render(&self) -> Vec<u8> {
+        vec![]
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{instrs::*, *};
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
+    use pretty_hex::*;
+    use u4::u4;
 
     #[test]
     fn synthesized_hello_world_apk() {
         let mut dex = Dex::new();
-        dex.classes.add(ClassDef{
+        dex.classes.push(ClassDef {
             class: "Lhw;".to_owned(),
             access: Access::Public.into(),
             superclass: Some("Ljava/lang/Object;".to_owned()),
-            classData: ClassData{
-                directMethods: vec![
-                    EncodedMethod{
-                        m: Method {
-                            class: "Lhw;".to_owned(),
-                            name: "main".to_owned(),
-                            prototype: Prototype{
-                                ret: "V".to_owned(),
-                                params: vec!["[Ljava/lang/String;".to_owned()],
-                            },
+            interfaces: TypeList::default(),
+            class_data: Some(ClassData {
+                direct_methods: vec![EncodedMethod {
+                    m: Method {
+                        class: "Lhw;".to_owned(),
+                        name: "main".to_owned(),
+                        prototype: Prototype {
+                            ret: "V".to_owned(),
+                            params: vec!["[Ljava/lang/String;".to_owned()],
                         },
-                        access: Access::Public | Access::Static,
-                        code: Code {
-                            registers: 2,
-                            ins: 1,
-                            outs: 2,
-                            instrs: vec![
-                                sget_object(0, Field {
+                    },
+                    access: Access::Public | Access::Static,
+                    annotations: vec![],
+                    code: Some(Code {
+                        registers: 2,
+                        ins: 1,
+                        outs: 2,
+                        instrs: vec![
+                            sget_object(
+                                0,
+                                Field {
                                     class: "Ljava/lang/System;".to_owned(),
                                     typ: "Ljava/io/PrintStream;".to_owned(),
                                     name: "out".to_owned(),
-                                }),
-                                const_string(1, "Hello World!"),
-                                invoke_virtual(0, 1, Method {
+                                },
+                            ),
+                            const_string(1, "Hello World!".to_owned()),
+                            invoke_virtual2(
+                                u4!(0),
+                                u4!(1),
+                                Method {
                                     class: "Ljava/io/PrintStream;".to_owned(),
                                     name: "println".to_owned(),
-                                    prototype: Prototype{
+                                    prototype: Prototype {
                                         ret: "V".to_owned(),
                                         params: vec!["Ljava/lang/String;".to_owned()],
                                     },
-                                }),
-                                return_void(),
-                            ],
-                        },
-                    },
-                ],
+                                },
+                            ),
+                            return_void(),
+                        ],
+                    }),
+                }],
                 ..Default::default()
-            },
+            }),
         });
         assert_eq!(
-            dex.render(),
-            parse_hex(HELLO_WORLD_APK_HEXDUMP),
+            pretty_hex(&dex.render()),
+            pretty_hex(&parse_hex(HELLO_WORLD_APK_HEXDUMP)),
         );
     }
 
@@ -189,9 +197,9 @@ ac00 0000 0500 0000 0500 0000 d000 0000
     fn parse_hex(s: &str) -> Vec<u8> {
         fn parse_nibble(c: u8) -> u8 {
             match c {
-                b'0'..=b'9' => c-b'0',
-                b'a'..=b'f' => c-b'a'+0xa,
-                b'A'..=b'F' => c-b'A'+0xa,
+                b'0'..=b'9' => c - b'0',
+                b'a'..=b'f' => c - b'a' + 0xa,
+                b'A'..=b'F' => c - b'A' + 0xa,
                 _ => panic!("not a hex digit: '{}'", c as char),
             }
         }
