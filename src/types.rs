@@ -91,6 +91,19 @@ pub struct Prototype {
     pub params: TypeList,
 }
 
+impl Prototype {
+    pub(crate) fn descriptor(&self) -> String {
+        fn type_char(t: &Type) -> char {
+            match t.as_bytes() {
+                b @ [b'V' | b'Z' | b'B' | b'S' | b'C' | b'I' | b'J' | b'F' | b'D'] => b[0] as char,
+                [b'[' | b'L', ..] => 'L',
+                _ => panic!("unexpected type in prototype: {t:?}"),
+            }
+        }
+        Some(&self.ret).into_iter().chain(self.params.iter()).map(type_char).collect()
+    }
+}
+
 pub struct Instr {
     pub opcode: u8,
     // NOTE: We're assuming little endian encoding of the

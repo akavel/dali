@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::Write;
 
 use enumflags2::{bitflags, BitFlags};
@@ -8,12 +9,56 @@ mod instrs;
 
 #[derive(Default)]
 pub struct Dex {
-    pub classes: Vec<ClassDef>,
+    // TODO[LATER]: use interned strings instead of String
+    strings: BTreeMap<String, u32>, // value: order of addition
+    classes: Vec<ClassDef>,
 }
 
 impl Dex {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn add_class(&mut self, c: ClassDef) {
+        // Collect strings and all the things from the class
+        // (types, prototypes/signatures, fields, methods).
+        self.add_type(&c.class);
+        if let Some(ref t) = c.superclass {
+            self.add_type(t);
+        }
+        // FIXME: if c.interfaces.len() > 0...
+        if let Some(ref cd) = c.class_data {
+            for f in &cd.instance_fields {
+                self.add_field(&f.f);
+            }
+            for m in cd.direct_methods.iter().chain(cd.virtual_methods.iter()) {
+                self.add_method(&m.m);
+                for a in &m.annotations {
+                    self.add_type(&a.encoded_annotation.typ);
+                    for el in &a.encoded_annotation.elems {
+                        self.add_str(&el.name);
+                        // FIXME: self.add_enc_value(el.value);
+                    }
+                }
+                let Some(ref code) = m.code else { continue; };
+                for instr in &code.instrs {
+                    for arg in &instr.args {
+                        use crate::Arg::*;
+                        match arg {
+                            FieldXXXX(f) => self.add_field(&f),
+                            StringXXXX(s) => self.add_str(&s),
+                            TypeXXXX(t) => self.add_type(&t),
+                            MethodXXXX(m) => self.add_method(&m),
+                            RawX(_) | RawXX(_) | RawXXXX(_) => {},
+                            RegX(_) | RegXX(_) => {},
+                        }
+                    }
+                }
+            }
+            // ...
+        }
+
+        self.classes.push(c);
     }
 
     pub fn render(&self) -> Vec<u8> {
@@ -27,8 +72,55 @@ impl Dex {
         blob.write(&0x12345678u32.to_le_bytes()); // Endian constant
         blob.write(&0u32.to_le_bytes()); // link_size
         blob.write(&0u32.to_le_bytes()); // link_off
+        blob.write(&[0u8; 4]); // FIXME: map_offset slot32
+        blob.write(&TryInto::<u32>::try_into(self.strings.len()).unwrap().to_le_bytes());
 
         blob
+    }
+
+    fn add_field(&mut self, f: &Field) {
+        self.add_type(&f.class);
+        self.add_type(&f.typ);
+        self.add_str(&f.name);
+        // FIXME: self.fields.incl((f.class, f.name, f.typ))
+    }
+
+    fn add_method(&mut self, m: &Method) {
+        self.add_type(&m.class);
+        self.add_prototype(&m.prototype);
+        self.add_str(&m.name);
+        // FIXME: self.methods.incl((m.class, m.name, m.prototype))
+    }
+
+    fn add_prototype(&mut self, p: &Prototype) {
+        self.add_type(&p.ret);
+        self.add_type_list(&p.params);
+        // FIXME: self.prototypes.incl(p)
+        self.add_str(&p.descriptor());
+    }
+
+    fn add_type_list(&mut self, ts: &Vec<Type>) {
+        if ts.len() == 0 {return;}
+        for t in ts {
+            self.add_type(t);
+        }
+        // FIXME: if ts notin self.type_lists { self.type_lists.add(ts); }
+    }
+
+    fn add_type(&mut self, t: &Type) {
+        self.add_str(t);
+        // FIXME: self.types.insert(t);
+    }
+
+    fn add_str(&mut self, s: &String) {
+        if s.bytes().any(|c| c==0 || c>=0x80) {
+            todo!("strings with 0x00 or 0x80..0xFF bytes are not yet supported");
+        }
+        // "This list must be sorted by string contents, using UTF-16 code point
+        // values (not in a locale-sensitive manner), and it must not contain any
+        // duplicate entries." [dex-format]
+        let n: u32 = self.strings.len().try_into().unwrap();
+        self.strings.entry(s.clone()).or_insert(n);
     }
 }
 
@@ -43,7 +135,7 @@ mod tests {
     #[test]
     fn synthesized_hello_world_apk() {
         let mut dex = Dex::new();
-        dex.classes.push(ClassDef {
+        dex.add_class(ClassDef {
             class: "Lhw;".to_owned(),
             access: Access::Public.into(),
             superclass: Some("Ljava/lang/Object;".to_owned()),
