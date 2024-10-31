@@ -16,6 +16,9 @@ pub struct Dex {
     // NOTE: prototypes must have no duplicates, TODO: and be sorted by:
     // (ret's type ID; args' type ID)
     prototypes: BTreeSet<Prototype>,
+    // NOTE: fields must have no duplicates, TODO: and be sorted by:
+    // (class type ID, field name's string ID, field's type ID)
+    fields: BTreeSet<Field>,
     classes: Vec<ClassDef>,
 }
 
@@ -85,6 +88,8 @@ impl Dex {
         blob.write(&self.types.len().to_u32().unwrap().to_le_bytes());
         blob.write(&[0u8; 4]); // FIXME: type_ids_offs slot32
         blob.write(&self.prototypes.len().to_u32().unwrap().to_le_bytes());
+        blob.write(&[0u8; 4]); // FIXME: proto_ids_offs slot32
+        blob.write(&self.fields.len().to_u32().unwrap().to_le_bytes());
 
         blob
     }
@@ -93,7 +98,7 @@ impl Dex {
         self.add_type(&f.class);
         self.add_type(&f.typ);
         self.add_str(&f.name);
-        // FIXME: self.fields.incl((f.class, f.name, f.typ))
+        self.fields.insert(f.clone());
     }
 
     fn add_method(&mut self, m: &Method) {

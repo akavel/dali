@@ -74,10 +74,11 @@ pub struct AnnotationElement {
     pub value: EncodedValue,
 }
 
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Field {
     pub class: Type,
-    pub typ: Type,
     pub name: String,
+    pub typ: Type,
 }
 
 pub struct Method {
