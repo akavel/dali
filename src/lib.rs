@@ -2,13 +2,14 @@ use std::collections::BTreeMap;
 use std::io::Write;
 
 use byteorder::{WriteBytesExt, LE};
-use enumflags2::{bitflags, BitFlags};
 use indexset::BTreeSet;
 use num::ToPrimitive;
 
+mod instrs;
+mod util;
+use util::VecU8Ext;
 mod types;
 pub use types::*;
-mod instrs;
 
 #[derive(Default)]
 pub struct Dex {
@@ -190,6 +191,35 @@ impl Dex {
             blob.write(&[0u8; 4]); // TODO: static_values
         }
 
+        //-- Render code items
+        //FIXME: let dataStart = blob.pos
+        //FIXME: blob[slots.dataOff] = dataStart
+        let mut code_items = 0;
+        for c in &self.classes {
+            let Some(ref cd) = c.class_data else {
+                continue;
+            };
+            for m in cd.direct_methods.iter().chain(cd.virtual_methods.iter()) {
+                let Some(ref code) = m.code else {
+                    continue;
+                };
+                code_items += 1;
+                blob.pad32();
+                //FIXME: codeOffsets[em.m.asTuple] = blob.pos
+                blob.write_u16::<LE>(code.registers);
+                blob.write_u16::<LE>(code.ins);
+                blob.write_u16::<LE>(code.outs);
+                blob.write_u16::<LE>(0u16); // TODO: tries_size
+                blob.write_u32::<LE>(0u32); // TODO: debug_info_off
+                blob.write(&[0u8; 4]); // FIXME: slot   # This shall be filled with size of instrs, in 16-bit code units
+                self.render_instrs(&mut blob, &code.instrs, &string_ids);
+                //FIXME: blob[slot] = (blob.pos - slot.uint32 - 4) div 2
+            }
+        }
+        if code_items > 0 {
+            //FIXME: sections.add (0x2001'u16, dataStart, codeItems)
+        }
+
         blob
     }
 
@@ -246,6 +276,47 @@ impl Dex {
             ordering.insert(*added, i.try_into().unwrap());
         }
         ordering
+    }
+
+    fn render_instrs(
+        &self,
+        blob: &mut Vec<u8>,
+        instrs: &Vec<Instr>,
+        string_ids: &BTreeMap<u32, u32>,
+    ) {
+        let mut high = true;
+        for instr in instrs {
+            blob.write_u8(instr.opcode);
+            for arg in &instr.args {
+                // FIXME: padding
+                use crate::Arg::*;
+                match arg {
+                    RawX(v) | RegX(v) => {
+                        blob.put_u4(*v, &mut high);
+                    }
+                    RawXX(v) | RegXX(v) => {
+                        blob.push(*v);
+                    }
+                    RawXXXX(v) => {
+                        blob.write_u16::<LE>(*v);
+                    }
+                    FieldXXXX(v) => {
+                        blob.write_u16::<LE>(self.fields.rank(v).to_u16().unwrap());
+                    }
+                    StringXXXX(v) => {
+                        blob.write_u16::<LE>(
+                            string_ids.get(&self.strings[v]).unwrap().to_u16().unwrap(),
+                        );
+                    }
+                    TypeXXXX(v) => {
+                        blob.write_u16::<LE>(self.types.rank(v).to_u16().unwrap());
+                    }
+                    MethodXXXX(v) => {
+                        blob.write_u16::<LE>(self.methods.rank(v).to_u16().unwrap());
+                    }
+                }
+            }
+        }
     }
 }
 
