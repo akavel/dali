@@ -95,6 +95,8 @@ impl Dex {
         blob.write(&self.fields.len().to_u32().unwrap().to_le_bytes());
         blob.write(&[0u8; 4]); // FIXME: field_ids_off slot32
         blob.write(&self.methods.len().to_u32().unwrap().to_le_bytes());
+        blob.write(&[0u8; 4]); // FIXME: method_ids_off slot32
+        blob.write(&self.classes.len().to_u32().unwrap().to_le_bytes());
 
         blob
     }
