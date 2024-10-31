@@ -13,6 +13,9 @@ pub struct Dex {
     // TODO[LATER]: use interned strings instead of String
     strings: BTreeMap<String, u32>, // value: order of addition
     types: BTreeSet<String>,
+    // NOTE: prototypes must have no duplicates, TODO: and be sorted by:
+    // (ret's type ID; args' type ID)
+    prototypes: BTreeSet<Prototype>,
     classes: Vec<ClassDef>,
 }
 
@@ -80,6 +83,8 @@ impl Dex {
         blob.write(&self.strings.len().to_u32().unwrap().to_le_bytes());
         blob.write(&[0u8; 4]); // FIXME: string_ids_offs slot32
         blob.write(&self.types.len().to_u32().unwrap().to_le_bytes());
+        blob.write(&[0u8; 4]); // FIXME: type_ids_offs slot32
+        blob.write(&self.prototypes.len().to_u32().unwrap().to_le_bytes());
 
         blob
     }
@@ -101,7 +106,7 @@ impl Dex {
     fn add_prototype(&mut self, p: &Prototype) {
         self.add_type(&p.ret);
         self.add_type_list(&p.params);
-        // FIXME: self.prototypes.incl(p)
+        self.prototypes.insert(p.clone());
         self.add_str(&p.descriptor());
     }
 

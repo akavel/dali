@@ -86,6 +86,7 @@ pub struct Method {
     pub name: String,
 }
 
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Prototype {
     pub ret: Type,
     pub params: TypeList,
