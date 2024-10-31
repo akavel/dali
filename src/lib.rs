@@ -16,6 +16,7 @@ pub struct Dex {
     // TODO[LATER]: use interned strings instead of String
     strings: BTreeMap<String, u32>, // value: order of addition
     types: BTreeSet<String>,
+    type_lists: Vec<Vec<Type>>,
     // NOTE: prototypes must have no duplicates, TODO: and be sorted by:
     // (ret's type ID; args' type ID)
     prototypes: BTreeSet<Prototype>,
@@ -220,6 +221,19 @@ impl Dex {
             //FIXME: sections.add (0x2001'u16, dataStart, codeItems)
         }
 
+        //-- Render type lists
+        blob.pad32();
+        //FIXME: if dex.typeLists.len > 0:
+        //FIXME:   sections.add (0x1001'u16, blob.pos, dex.typeLists.len)
+        for l in &self.type_lists {
+            blob.pad32();
+            //FIXME: typeListOffsets.setAll(l, blob.pos, blob)
+            blob.write_u32::<LE>(l.len().to_u32().unwrap());
+            for t in l {
+                blob.write_u16::<LE>(self.types.rank(t).to_u16().unwrap());
+            }
+        }
+
         blob
     }
 
@@ -251,7 +265,9 @@ impl Dex {
         for t in ts {
             self.add_type(t);
         }
-        // FIXME: if ts notin self.type_lists { self.type_lists.add(ts); }
+        if !self.type_lists.contains(ts) {
+            self.type_lists.push(ts.clone());
+        }
     }
 
     fn add_type(&mut self, t: &Type) {
