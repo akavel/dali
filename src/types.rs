@@ -81,10 +81,11 @@ pub struct Field {
     pub typ: Type,
 }
 
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Method {
     pub class: Type,
-    pub prototype: Prototype, // a.k.a. method signature
     pub name: String,
+    pub prototype: Prototype, // a.k.a. method signature
 }
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]

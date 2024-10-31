@@ -19,6 +19,9 @@ pub struct Dex {
     // NOTE: fields must have no duplicates, TODO: and be sorted by:
     // (class type ID, field name's string ID, field's type ID)
     fields: BTreeSet<Field>,
+    // NOTE: methods must have no duplicates, TODO: and be sorted by:
+    // (class type ID, name's string ID, prototype's proto ID)
+    methods: BTreeSet<Method>,
     classes: Vec<ClassDef>,
 }
 
@@ -84,12 +87,14 @@ impl Dex {
         blob.write(&0u32.to_le_bytes()); // link_off
         blob.write(&[0u8; 4]); // FIXME: map_offset slot32
         blob.write(&self.strings.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: string_ids_offs slot32
+        blob.write(&[0u8; 4]); // FIXME: string_ids_off slot32
         blob.write(&self.types.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: type_ids_offs slot32
+        blob.write(&[0u8; 4]); // FIXME: type_ids_off slot32
         blob.write(&self.prototypes.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: proto_ids_offs slot32
+        blob.write(&[0u8; 4]); // FIXME: proto_ids_off slot32
         blob.write(&self.fields.len().to_u32().unwrap().to_le_bytes());
+        blob.write(&[0u8; 4]); // FIXME: field_ids_off slot32
+        blob.write(&self.methods.len().to_u32().unwrap().to_le_bytes());
 
         blob
     }
@@ -105,7 +110,7 @@ impl Dex {
         self.add_type(&m.class);
         self.add_prototype(&m.prototype);
         self.add_str(&m.name);
-        // FIXME: self.methods.incl((m.class, m.name, m.prototype))
+        self.methods.insert(m.clone());
     }
 
     fn add_prototype(&mut self, p: &Prototype) {
