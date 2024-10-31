@@ -14,7 +14,7 @@ pub use types::*;
 #[derive(Default)]
 pub struct Dex {
     // TODO[LATER]: use interned strings instead of String
-    strings: BTreeMap<String, u32>, // value: order of addition
+    strings: BTreeMap<String, usize>, // value: order of addition
     types: BTreeSet<String>,
     type_lists: Vec<Vec<Type>>,
     // NOTE: prototypes must have no duplicates, TODO: and be sorted by:
@@ -121,7 +121,7 @@ impl Dex {
         // self.types are already stored sorted, same as self.strings, so we don't need
         // to sort again by type IDs
         for t in &self.types {
-            blob.write_u32::<LE>(*string_ids.get(&self.strings[t]).unwrap());
+            blob.write_u32::<LE>(string_ids[self.strings[t]]);
         }
 
         //-- Partially render proto IDs.
@@ -131,7 +131,7 @@ impl Dex {
         //FIXME: blob[slots.protoIdsOff] = blob.pos
         for p in &self.prototypes {
             let desc = &p.descriptor();
-            blob.write_u32::<LE>(*string_ids.get(&self.strings[desc]).unwrap());
+            blob.write_u32::<LE>(string_ids[self.strings[desc]]);
             blob.write_u32::<LE>(self.types.rank(&p.ret).to_u32().unwrap());
             blob.write(&[0u8; 4]); // FIXME: type_list_offs[i] slot32
         }
@@ -144,7 +144,7 @@ impl Dex {
         for f in &self.fields {
             blob.write_u16::<LE>(self.types.rank(&f.class).to_u16().unwrap());
             blob.write_u16::<LE>(self.types.rank(&f.typ).to_u16().unwrap());
-            blob.write_u32::<LE>(*string_ids.get(&self.strings[&f.name]).unwrap());
+            blob.write_u32::<LE>(string_ids[self.strings[&f.name]]);
         }
 
         //-- Render method IDs
@@ -154,7 +154,7 @@ impl Dex {
         for m in &self.methods {
             blob.write_u16::<LE>(self.types.rank(&m.class).to_u16().unwrap());
             blob.write_u16::<LE>(self.prototypes.rank(&m.prototype).to_u16().unwrap());
-            blob.write_u32::<LE>(*string_ids.get(&self.strings[&m.name]).unwrap());
+            blob.write_u32::<LE>(string_ids[self.strings[&m.name]]);
         }
 
         //-- Partially render class defs.
@@ -234,6 +234,19 @@ impl Dex {
             }
         }
 
+        //-- Render strings data
+        //FIXME: sections.add (0x2002'u16, blob.pos, dex.strings.len)
+        for s in self.strings_as_added() {
+            //FIXME: let slot = slots.stringOffsets[stringIds[dex.strings[s]]]
+            //FIXME: blob[slot] = blob.pos
+            // FIXME: MUTF-8: encode U+0000 as hex: C0 80
+            // FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
+            // FIXME: length *in UTF-16 code units*, as ULEB128
+            blob.put_uleb128(s.len().to_u32().unwrap());
+            blob.write(s.as_bytes());
+            blob.write_u8(0u8); // string-terminator NULL byte
+        }
+
         blob
     }
 
@@ -282,24 +295,29 @@ impl Dex {
         // "This list must be sorted by string contents, using UTF-16 code point
         // values (not in a locale-sensitive manner), and it must not contain any
         // duplicate entries." [dex-format]
-        let n: u32 = self.strings.len().try_into().unwrap();
+        let n = self.strings.len();
         self.strings.entry(s.clone()).or_insert(n);
     }
 
-    fn strings_ordering(&self) -> BTreeMap<u32, u32> {
-        let mut ordering = BTreeMap::new();
+    fn strings_ordering(&self) -> Vec<u32> {
+        let mut ordering = Vec::new();
+        ordering.resize(self.strings.len(), 0u32);
         for (i, added) in self.strings.values().enumerate() {
-            ordering.insert(*added, i.try_into().unwrap());
+            ordering[*added] = i.to_u32().unwrap();
         }
         ordering
     }
 
-    fn render_instrs(
-        &self,
-        blob: &mut Vec<u8>,
-        instrs: &Vec<Instr>,
-        string_ids: &BTreeMap<u32, u32>,
-    ) {
+    fn strings_as_added(&self) -> Vec<String> {
+        let mut result = Vec::new();
+        result.resize(self.strings.len(), String::new());
+        for (s, added) in &self.strings {
+            result[*added] = s.clone();
+        }
+        result
+    }
+
+    fn render_instrs(&self, blob: &mut Vec<u8>, instrs: &Vec<Instr>, string_ids: &Vec<u32>) {
         let mut high = true;
         for instr in instrs {
             blob.write_u8(instr.opcode);
@@ -320,9 +338,7 @@ impl Dex {
                         blob.write_u16::<LE>(self.fields.rank(v).to_u16().unwrap());
                     }
                     StringXXXX(v) => {
-                        blob.write_u16::<LE>(
-                            string_ids.get(&self.strings[v]).unwrap().to_u16().unwrap(),
-                        );
+                        blob.write_u16::<LE>(string_ids[self.strings[v]].to_u16().unwrap());
                     }
                     TypeXXXX(v) => {
                         blob.write_u16::<LE>(self.types.rank(v).to_u16().unwrap());
