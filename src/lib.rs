@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use enumflags2::{bitflags, BitFlags};
 
 mod types;
@@ -15,7 +17,18 @@ impl Dex {
     }
 
     pub fn render(&self) -> Vec<u8> {
-        vec![]
+        let mut blob: Vec<u8> = vec![];
+
+        write!(blob, "dex\n035\x00");
+        blob.write(&[0u8; 4]); // FIXME: adler_sum slot32
+        blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
+        blob.write(&[0u8; 4]); // FIXME: file_size slot32
+        blob.write(&0x70u32.to_le_bytes()); // Header size
+        blob.write(&0x12345678u32.to_le_bytes()); // Endian constant
+        blob.write(&0u32.to_le_bytes()); // link_size
+        blob.write(&0u32.to_le_bytes()); // link_off
+
+        blob
     }
 }
 
