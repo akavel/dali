@@ -40,7 +40,9 @@ impl Dex {
                         // FIXME: self.add_enc_value(el.value);
                     }
                 }
-                let Some(ref code) = m.code else { continue; };
+                let Some(ref code) = m.code else {
+                    continue;
+                };
                 for instr in &code.instrs {
                     for arg in &instr.args {
                         use crate::Arg::*;
@@ -49,8 +51,8 @@ impl Dex {
                             StringXXXX(s) => self.add_str(&s),
                             TypeXXXX(t) => self.add_type(&t),
                             MethodXXXX(m) => self.add_method(&m),
-                            RawX(_) | RawXX(_) | RawXXXX(_) => {},
-                            RegX(_) | RegXX(_) => {},
+                            RawX(_) | RawXX(_) | RawXXXX(_) => {}
+                            RegX(_) | RegXX(_) => {}
                         }
                     }
                 }
@@ -73,7 +75,11 @@ impl Dex {
         blob.write(&0u32.to_le_bytes()); // link_size
         blob.write(&0u32.to_le_bytes()); // link_off
         blob.write(&[0u8; 4]); // FIXME: map_offset slot32
-        blob.write(&TryInto::<u32>::try_into(self.strings.len()).unwrap().to_le_bytes());
+        blob.write(
+            &TryInto::<u32>::try_into(self.strings.len())
+                .unwrap()
+                .to_le_bytes(),
+        );
 
         blob
     }
@@ -100,7 +106,9 @@ impl Dex {
     }
 
     fn add_type_list(&mut self, ts: &Vec<Type>) {
-        if ts.len() == 0 {return;}
+        if ts.len() == 0 {
+            return;
+        }
         for t in ts {
             self.add_type(t);
         }
@@ -113,7 +121,7 @@ impl Dex {
     }
 
     fn add_str(&mut self, s: &String) {
-        if s.bytes().any(|c| c==0 || c>=0x80) {
+        if s.bytes().any(|c| c == 0 || c >= 0x80) {
             todo!("strings with 0x00 or 0x80..0xFF bytes are not yet supported");
         }
         // "This list must be sorted by string contents, using UTF-16 code point

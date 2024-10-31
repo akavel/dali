@@ -100,7 +100,11 @@ impl Prototype {
                 _ => panic!("unexpected type in prototype: {t:?}"),
             }
         }
-        Some(&self.ret).into_iter().chain(self.params.iter()).map(type_char).collect()
+        Some(&self.ret)
+            .into_iter()
+            .chain(self.params.iter())
+            .map(type_char)
+            .collect()
     }
 }
 
