@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+enumflags2 = { version = "0.7.10", features = ["std"] }
+
+[dev-dependencies]
+itertools = "0.13.0"
+pretty_assertions = "1.4.1"
