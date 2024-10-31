@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 enumflags2 = { version = "0.7.10", features = ["std"] }
+num = "0.4.3"
 u4 = "0.1.2"
 
 [dev-dependencies]

@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 
 use enumflags2::{bitflags, BitFlags};
+use num::ToPrimitive;
 
 mod types;
 pub use types::*;
@@ -75,11 +76,7 @@ impl Dex {
         blob.write(&0u32.to_le_bytes()); // link_size
         blob.write(&0u32.to_le_bytes()); // link_off
         blob.write(&[0u8; 4]); // FIXME: map_offset slot32
-        blob.write(
-            &TryInto::<u32>::try_into(self.strings.len())
-                .unwrap()
-                .to_le_bytes(),
-        );
+        blob.write(&self.strings.len().to_u32().unwrap().to_le_bytes());
 
         blob
     }
