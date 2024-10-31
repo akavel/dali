@@ -155,6 +155,41 @@ impl Dex {
             blob.write_u32::<LE>(*string_ids.get(&self.strings[&m.name]).unwrap());
         }
 
+        //-- Partially render class defs.
+        //FIXME: sections.add (0x0006'u16, blob.pos, dex.classes.len)
+        //FIXME: blob[slots.classDefsOff] = blob.pos
+        const NO_INDEX: u32 = 0xffff_ffff;
+        for c in &self.classes {
+            blob.write_u32::<LE>(self.types.rank(&c.class).to_u32().unwrap());
+            blob.write_u32::<LE>(c.access.bits());
+            if let Some(ref sup) = c.superclass {
+                blob.write_u32::<LE>(self.types.rank(sup).to_u32().unwrap());
+            } else {
+                blob.write_u32::<LE>(NO_INDEX);
+            }
+            if c.interfaces.len() > 0 {
+                blob.write(&[0u8; 4]); // FIXME: type_list_offsets[...]
+            } else {
+                blob.write_u32::<LE>(0u32);
+            }
+            blob.write_u32::<LE>(NO_INDEX); // TODO: source_file_idx
+            let has_annotations = if let Some(ref cd) = c.class_data {
+                cd.direct_methods
+                    .iter()
+                    .chain(cd.virtual_methods.iter())
+                    .any(|m| m.annotations.len() > 0)
+            } else {
+                false
+            };
+            if has_annotations {
+                blob.write(&[0u8; 4]); // FIXME: annotation_data_offsets[...]
+            } else {
+                blob.write(&[0u8; 4]);
+            }
+            blob.write(&[0u8; 4]); // FIXME: class_data_offsets[...]
+            blob.write(&[0u8; 4]); // TODO: static_values
+        }
+
         blob
     }
 
