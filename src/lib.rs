@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::io::Write;
 
+use byteorder::{WriteBytesExt, LE};
 use enumflags2::{bitflags, BitFlags};
 use indexset::BTreeSet;
 use num::ToPrimitive;
@@ -118,7 +119,7 @@ impl Dex {
         // self.types are already stored sorted, same as self.strings, so we don't need
         // to sort again by type IDs
         for t in &self.types {
-            blob.write(&string_ids.get(&self.strings[t]).unwrap().to_le_bytes());
+            blob.write_u32::<LE>(*string_ids.get(&self.strings[t]).unwrap());
         }
 
         //-- Partially render proto IDs.
@@ -127,13 +128,9 @@ impl Dex {
         //FIXME: sections.add (0x0003'u16, blob.pos, dex.prototypes.len)
         //FIXME: blob[slots.protoIdsOff] = blob.pos
         for p in &self.prototypes {
-            blob.write(
-                &string_ids
-                    .get(&self.strings[&p.descriptor()])
-                    .unwrap()
-                    .to_le_bytes(),
-            );
-            blob.write(&self.types.rank(&p.ret).to_u32().unwrap().to_le_bytes());
+            let desc = &p.descriptor();
+            blob.write_u32::<LE>(*string_ids.get(&self.strings[desc]).unwrap());
+            blob.write_u32::<LE>(self.types.rank(&p.ret).to_u32().unwrap());
             blob.write(&[0u8; 4]); // FIXME: type_list_offs[i] slot32
         }
 
@@ -143,14 +140,9 @@ impl Dex {
             //FIXME: blob[slots.fieldIdsOff] = blob.pos
         }
         for f in &self.fields {
-            blob.write(&self.types.rank(&f.class).to_u16().unwrap().to_le_bytes());
-            blob.write(&self.types.rank(&f.class).to_u16().unwrap().to_le_bytes());
-            blob.write(
-                &string_ids
-                    .get(&self.strings[&f.name])
-                    .unwrap()
-                    .to_le_bytes(),
-            );
+            blob.write_u16::<LE>(self.types.rank(&f.class).to_u16().unwrap());
+            blob.write_u16::<LE>(self.types.rank(&f.typ).to_u16().unwrap());
+            blob.write_u32::<LE>(*string_ids.get(&self.strings[&f.name]).unwrap());
         }
 
         blob
