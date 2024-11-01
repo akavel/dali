@@ -110,34 +110,34 @@ impl Dex {
         blob.write(&0x12345678u32.to_le_bytes()); // Endian constant
         blob.write(&0u32.to_le_bytes()); // link_size
         blob.write(&0u32.to_le_bytes()); // link_off
-        blob.write(&[0u8; 4]); // FIXME: map_offset slot32
+        let map_offset = blob.slot32();
         blob.write(&self.strings.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: string_ids_off slot32
+        let string_ids_off = blob.slot32();
         blob.write(&self.types.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: type_ids_off slot32
+        let type_ids_off = blob.slot32();
         blob.write(&self.prototypes.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: proto_ids_off slot32
+        let proto_ids_off = blob.slot32();
         blob.write(&self.fields.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: field_ids_off slot32
+        let field_ids_off = blob.slot32();
         blob.write(&self.methods.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: method_ids_off slot32
+        let method_ids_off = blob.slot32();
         blob.write(&self.classes.len().to_u32().unwrap().to_le_bytes());
-        blob.write(&[0u8; 4]); // FIXME: class_defs_off slot32
+        let class_defs_off = blob.slot32();
         let data_size = blob.slot32();
-        blob.write(&[0u8; 4]); // FIXME: data_off slot32
+        let data_off = blob.slot32();
 
         //-- Partially render string_ids
         // We preallocate space for the list of string offsets. We cannot fill it yet, as its
         // contents will depend on the size of the other segments.
         sections.push(section(0x0001, blob.pos(), self.strings.len()));
-        //FIXME: blob[slots.stringIdsOff] = blob.pos
+        blob.set(string_ids_off, blob.pos());
         for i in 0..self.strings.len() {
             blob.write(&[0u8; 4]); // FIXME: string_offs[i] slot32
         }
 
         //-- Render typeIDs.
         sections.push(section(0x0002, blob.pos(), self.types.len()));
-        //FIXME: blob[slots.typeIdsOff] = blob.pos
+        blob.set(type_ids_off, blob.pos());
         let string_ids = self.strings_ordering();
         // self.types are already stored sorted, same as self.strings, so we don't need
         // to sort again by type IDs
@@ -149,7 +149,7 @@ impl Dex {
         // We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
         // segments inbetween.
         sections.push(section(0x0003, blob.pos(), self.prototypes.len()));
-        //FIXME: blob[slots.protoIdsOff] = blob.pos
+        blob.set(proto_ids_off, blob.pos());
         for p in &self.prototypes {
             let desc = &p.descriptor();
             blob.write_u32::<LE>(string_ids[self.strings[desc]]);
@@ -160,7 +160,7 @@ impl Dex {
         //-- Render field IDs
         if self.fields.len() > 0 {
             sections.push(section(0x0004, blob.pos(), self.fields.len()));
-            //FIXME: blob[slots.fieldIdsOff] = blob.pos
+            blob.set(field_ids_off, blob.pos());
         }
         for f in &self.fields {
             blob.write_u16::<LE>(self.types.rank(&f.class).to_u16().unwrap());
@@ -170,8 +170,9 @@ impl Dex {
 
         //-- Render method IDs
         sections.push(section(0x0005, blob.pos(), self.methods.len()));
-        //FIXME: if dex.methods.len > 0:
-        //FIXME:   blob[slots.methodIdsOff] = blob.pos
+        if self.methods.len() > 0 {
+            blob.set(method_ids_off, blob.pos());
+        }
         for m in &self.methods {
             blob.write_u16::<LE>(self.types.rank(&m.class).to_u16().unwrap());
             blob.write_u16::<LE>(self.prototypes.rank(&m.prototype).to_u16().unwrap());
@@ -180,7 +181,7 @@ impl Dex {
 
         //-- Partially render class defs.
         sections.push(section(0x0006, blob.pos(), self.classes.len()));
-        //FIXME: blob[slots.classDefsOff] = blob.pos
+        blob.set(class_defs_off, blob.pos());
         let mut annotation_data_offsets = Slots32::<Type>::new();
         const NO_INDEX: u32 = 0xffff_ffff;
         for c in &self.classes {
@@ -216,7 +217,7 @@ impl Dex {
 
         //-- Render code items
         let data_start = blob.pos();
-        //FIXME: blob[slots.dataOff] = dataStart
+        blob.set(data_off, blob.pos());
         let mut code_items = 0;
         let mut code_offsets = BTreeMap::<Method, u32>::new();
         for c in &self.classes {
@@ -382,7 +383,7 @@ impl Dex {
         //-- Render map_list
         blob.pad32();
         sections.push(section(0x1000, blob.pos(), 1));
-        //FIXME: blob[slots.mapOffset] = blob.pos
+        blob.set(map_offset, blob.pos());
         blob.write_u32::<LE>(sections.len().to_u32().unwrap());
         for s in &sections {
             blob.write_u16::<LE>(s.kind);
