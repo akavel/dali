@@ -2,11 +2,22 @@ use crate::types::{Arg::*, *};
 use u4::u4;
 
 macro_rules! instr {
-    ($op:expr $(; $( $arg:expr ),* $(,)? )? ) => {
+    ($op:expr ; $( $args:tt )+ ) => {
         Instr {
             opcode: $op,
-            args: vec![ $( $( $arg, )* )? ],
+            args: instr_args!( $($args)* ).collect(),
         }
+    }
+}
+
+macro_rules! instr_args {
+    ( RawX($n:literal) $(, $( $($more:tt)+ )? )? ) => {
+        [ RawX(u4!($n)) ].into_iter()
+            $( $( .chain(instr_args!( $($more)+ )) )? )?
+    };
+    ( $arg:expr $(, $( $($more:tt)+ )? )? ) => {
+        [ $arg ].into_iter()
+            $( $( .chain(instr_args!( $($more)+ )) )? )?
     }
 }
 
@@ -35,19 +46,11 @@ pub fn invoke_super2(reg_c: U4, reg_d: U4, m: Method) -> Instr {
 
 pub fn invoke_direct1(reg_c: U4, m: Method) -> Instr {
     instr!(0x70;
-        RawX(u4!(1)), RawX(u4!(0)),
-        MethodXXXX(m),
-        RawX(u4!(0)), RegX(reg_c),
-        RawXX(0),
-    )
+       RawX(1), RawX(0), MethodXXXX(m), RawX(0), RegX(reg_c), RawXX(0))
 }
 
 // helper
 fn invoke2(opcode: u8, reg_c: U4, reg_d: U4, m: Method) -> Instr {
     instr!(opcode;
-        RawX(u4!(2)), RawX(u4!(0)),
-        MethodXXXX(m),
-        RegX(reg_d), RegX(reg_c),
-        RawXX(0),
-    )
+        RawX(2), RawX(0), MethodXXXX(m), RegX(reg_d), RegX(reg_c), RawXX(0))
 }
