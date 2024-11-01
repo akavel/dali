@@ -7,7 +7,7 @@ use num::ToPrimitive;
 
 mod instrs;
 mod util;
-use util::VecU8Ext;
+use util::{Slot32, Slots32, VecU8Ext};
 mod types;
 pub use types::*;
 
@@ -160,6 +160,7 @@ impl Dex {
         //-- Partially render class defs.
         //FIXME: sections.add (0x0006'u16, blob.pos, dex.classes.len)
         //FIXME: blob[slots.classDefsOff] = blob.pos
+        let mut annotation_data_offsets = Slots32::<Type>::new();
         const NO_INDEX: u32 = 0xffff_ffff;
         for c in &self.classes {
             blob.write_u32::<LE>(self.types.rank(&c.class).to_u32().unwrap());
@@ -184,7 +185,7 @@ impl Dex {
                 false
             };
             if has_annotations {
-                blob.write(&[0u8; 4]); // FIXME: annotation_data_offsets[...]
+                annotation_data_offsets.insert(c.class.clone(), blob.slot32());
             } else {
                 blob.write(&[0u8; 4]);
             }
@@ -266,6 +267,36 @@ impl Dex {
             self.render_encoded_fields(&mut blob, &d.instance_fields);
             self.render_encoded_methods(&mut blob, d.direct_methods.clone(), &code_offsets);
             self.render_encoded_methods(&mut blob, d.virtual_methods.clone(), &code_offsets);
+        }
+
+        //-- Render annotations data
+        if annotation_data_offsets.len() > 0 {
+            blob.pad32();
+            //FIXME: sections.add (0x2006'u16, blob.pos, annotationDataOffsets.len)
+        }
+        //FIXME: var methodAnnotationSetsOffsets: Slots32[MethodTuple]
+        for c in &self.classes {
+            if !annotation_data_offsets.contains(&c.class) {
+                continue;
+            }
+            annotation_data_offsets.set_all_here(&c.class, &mut blob);
+            let Some(ref cd) = c.class_data else {
+                continue;
+            };
+            blob.write_u32::<LE>(0u32); // TODO: class_annotations_off
+            blob.write_u32::<LE>(0u32); // TODO: fields_size
+            let n_methods_slot = blob.slot32();
+            let mut n_methods = 0u32;
+            blob.write_u32::<LE>(0u32); // TODO: annotated_parameters_size
+            for m in cd.direct_methods.iter().chain(cd.virtual_methods.iter()) {
+                if m.annotations.len() == 0 {
+                    continue;
+                }
+                blob.write_u32::<LE>(self.methods.rank(&m.m).to_u32().unwrap());
+                blob.write(&[0u8; 4]); // FIXME: methodAnnotationSetsOffsets
+                n_methods += 1;
+            }
+            blob.set(n_methods_slot, n_methods);
         }
 
         blob

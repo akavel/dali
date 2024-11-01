@@ -1,10 +1,17 @@
+use std::borrow::Borrow;
+use std::collections::BTreeMap;
 use std::io::Write;
+use std::rc::Rc;
+
+use num::ToPrimitive;
 use u4::{u4, U4x2, U4};
 
 pub trait VecU8Ext {
     fn pad32(&mut self);
     fn put_u4(&mut self, v: U4, high: &mut bool);
     fn put_uleb128(&mut self, v: u32);
+    fn slot32(&mut self) -> Slot32;
+    fn set(&mut self, slot: Slot32, v: u32);
 }
 
 impl VecU8Ext for Vec<u8> {
@@ -42,6 +49,83 @@ impl VecU8Ext for Vec<u8> {
         }
         buf[i] = work as u8;
         self.write(&buf);
+    }
+
+    fn slot32(&mut self) -> Slot32 {
+        let slot = Slot32 {
+            offset: Some(self.len()),
+        };
+        self.write(&[0u8; 4]);
+        slot
+    }
+
+    fn set(&mut self, mut slot: Slot32, v: u32) {
+        let i = slot.offset.take().unwrap();
+        let b = v.to_le_bytes();
+        self[i + 0] = b[0];
+        self[i + 1] = b[1];
+        self[i + 2] = b[2];
+        self[i + 3] = b[3];
+    }
+}
+
+pub struct Slot32 {
+    offset: Option<usize>,
+}
+
+#[derive(Default)]
+pub struct Slots32<T> {
+    map: BTreeMap<T, Vec<Rc<Slot32>>>,
+}
+
+impl<T> Slots32<T> {
+    pub fn new() -> Self {
+        Self {
+            map: BTreeMap::new(),
+        }
+    }
+
+    pub fn contains<Q>(&self, key: &Q) -> bool
+    where
+        T: Borrow<Q> + Ord,
+        Q: Ord + ?Sized,
+    {
+        self.map.contains_key(key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    pub fn set_all_here<Q>(&mut self, key: &Q, blob: &mut Vec<u8>)
+    where
+        T: Borrow<Q> + Ord,
+        Q: Ord + ?Sized,
+    {
+        let pos = blob.len().to_u32().unwrap();
+        self.set_all(key, pos, blob);
+    }
+
+    fn set_all<Q>(&mut self, key: &Q, v: u32, blob: &mut Vec<u8>)
+    where
+        T: Borrow<Q> + Ord,
+        Q: Ord + ?Sized,
+    {
+        let Some(slots) = self.map.remove(key) else {
+            return;
+        };
+        for slot in slots {
+            blob.set(Rc::into_inner(slot).unwrap(), v);
+        }
+    }
+}
+
+impl<T: Ord> Slots32<T> {
+    pub fn insert(&mut self, key: T, value: Slot32) {
+        self.map
+            .entry(key)
+            .or_insert_with(|| vec![])
+            .push(Rc::new(value));
     }
 }
 
