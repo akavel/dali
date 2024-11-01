@@ -185,6 +185,7 @@ impl Dex {
         //-- Partially render class defs.
         sections.push(section(0x0006, blob.pos(), self.classes.len()));
         blob.set(class_defs_off, blob.pos());
+        let mut class_data_offsets = Slots32::<Type>::new();
         let mut annotation_data_offsets = Slots32::<Type>::new();
         const NO_INDEX: u32 = 0xffff_ffff;
         for c in &self.classes {
@@ -214,7 +215,7 @@ impl Dex {
             } else {
                 blob.write(&[0u8; 4]);
             }
-            blob.write(&[0u8; 4]); // FIXME: class_data_offsets[...]
+            class_data_offsets.insert(c.class.clone(), blob.slot32());
             blob.write(&[0u8; 4]); // TODO: static_values
         }
 
@@ -278,7 +279,7 @@ impl Dex {
         //-- Render class data
         sections.push(section(0x2000, blob.pos(), self.classes.len()));
         for c in &self.classes {
-            //FIXME: classDataOffsets.setAll(c.class, blob.pos, blob)
+            class_data_offsets.set_all_here(&c.class, &mut blob);
             let empty = ClassData::default();
             let d = if let Some(ref d) = c.class_data {
                 d
