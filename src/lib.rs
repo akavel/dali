@@ -145,7 +145,7 @@ impl Dex {
         // self.types are already stored sorted, same as self.strings, so we don't need
         // to sort again by type IDs
         for t in &self.types {
-            blob.write_u32::<LE>(string_ids[self.strings[t]]);
+            blob.put_u32(string_ids[self.strings[t]]);
         }
 
         //-- Partially render proto IDs.
@@ -156,8 +156,8 @@ impl Dex {
         let mut type_list_offs = Slots32::<Vec<Type>>::new();
         for p in &self.prototypes {
             let desc = &p.descriptor();
-            blob.write_u32::<LE>(string_ids[self.strings[desc]]);
-            blob.write_u32::<LE>(self.types.rank(&p.ret).to_u32().unwrap());
+            blob.put_u32(string_ids[self.strings[desc]]);
+            blob.put_usz32(self.types.rank(&p.ret));
             type_list_offs.insert(p.params.clone(), blob.slot32());
         }
 
@@ -169,7 +169,7 @@ impl Dex {
         for f in &self.fields {
             blob.write_u16::<LE>(self.types.rank(&f.class).to_u16().unwrap());
             blob.write_u16::<LE>(self.types.rank(&f.typ).to_u16().unwrap());
-            blob.write_u32::<LE>(string_ids[self.strings[&f.name]]);
+            blob.put_u32(string_ids[self.strings[&f.name]]);
         }
 
         //-- Render method IDs
@@ -180,7 +180,7 @@ impl Dex {
         for m in &self.methods {
             blob.write_u16::<LE>(self.types.rank(&m.class).to_u16().unwrap());
             blob.write_u16::<LE>(self.prototypes.rank(&m.prototype).to_u16().unwrap());
-            blob.write_u32::<LE>(string_ids[self.strings[&m.name]]);
+            blob.put_u32(string_ids[self.strings[&m.name]]);
         }
 
         //-- Partially render class defs.
@@ -190,19 +190,19 @@ impl Dex {
         let mut annotation_data_offsets = Slots32::<Type>::new();
         const NO_INDEX: u32 = 0xffff_ffff;
         for c in &self.classes {
-            blob.write_u32::<LE>(self.types.rank(&c.class).to_u32().unwrap());
-            blob.write_u32::<LE>(c.access.bits());
+            blob.put_usz32(self.types.rank(&c.class));
+            blob.put_u32(c.access.bits());
             if let Some(ref sup) = c.superclass {
-                blob.write_u32::<LE>(self.types.rank(sup).to_u32().unwrap());
+                blob.put_usz32(self.types.rank(sup));
             } else {
-                blob.write_u32::<LE>(NO_INDEX);
+                blob.put_u32(NO_INDEX);
             }
             if c.interfaces.len() > 0 {
                 type_list_offs.insert(c.interfaces.clone(), blob.slot32());
             } else {
-                blob.write_u32::<LE>(0u32);
+                blob.put_u32(0u32);
             }
-            blob.write_u32::<LE>(NO_INDEX); // TODO: source_file_idx
+            blob.put_u32(NO_INDEX); // TODO: source_file_idx
             let has_annotations = if let Some(ref cd) = c.class_data {
                 cd.direct_methods
                     .iter()
@@ -240,7 +240,7 @@ impl Dex {
                 blob.write_u16::<LE>(code.ins);
                 blob.write_u16::<LE>(code.outs);
                 blob.write_u16::<LE>(0u16); // TODO: tries_size
-                blob.write_u32::<LE>(0u32); // TODO: debug_info_off
+                blob.put_u32(0u32); // TODO: debug_info_off
                 let slot_off = blob.pos();
                 let slot = blob.slot32(); // Shall be filled with size of instrs, in 16-bit code units
                 self.render_instrs(&mut blob, &code.instrs, &string_ids);
@@ -259,7 +259,7 @@ impl Dex {
         for l in &self.type_lists {
             blob.pad32();
             type_list_offs.set_all_here(l, &mut blob);
-            blob.write_u32::<LE>(l.len().to_u32().unwrap());
+            blob.put_usz32(l.len());
             for t in l {
                 blob.write_u16::<LE>(self.types.rank(t).to_u16().unwrap());
             }
@@ -312,16 +312,16 @@ impl Dex {
             let Some(ref cd) = c.class_data else {
                 continue;
             };
-            blob.write_u32::<LE>(0u32); // TODO: class_annotations_off
-            blob.write_u32::<LE>(0u32); // TODO: fields_size
+            blob.put_u32(0u32); // TODO: class_annotations_off
+            blob.put_u32(0u32); // TODO: fields_size
             let n_methods_slot = blob.slot32();
             let mut n_methods = 0u32;
-            blob.write_u32::<LE>(0u32); // TODO: annotated_parameters_size
+            blob.put_u32(0u32); // TODO: annotated_parameters_size
             for m in cd.direct_methods.iter().chain(cd.virtual_methods.iter()) {
                 if m.annotations.len() == 0 {
                     continue;
                 }
-                blob.write_u32::<LE>(self.methods.rank(&m.m).to_u32().unwrap());
+                blob.put_usz32(self.methods.rank(&m.m));
                 method_annotation_sets_offsets.insert(m.m.clone(), blob.slot32());
                 n_methods += 1;
             }
@@ -350,7 +350,7 @@ impl Dex {
                     continue;
                 }
                 method_annotation_sets_offsets.set_all_here(&m.m, &mut blob);
-                blob.write_u32::<LE>(m.annotations.len().to_u32().unwrap());
+                blob.put_usz32(m.annotations.len());
                 method_annotations_offsets.insert((m.m.clone(), i), blob.slot32());
             }
             if method_annotations_offsets.len() > 0 {
@@ -390,12 +390,12 @@ impl Dex {
         blob.pad32();
         sections.push(section(0x1000, blob.pos(), 1));
         blob.set(map_offset, blob.pos());
-        blob.write_u32::<LE>(sections.len().to_u32().unwrap());
+        blob.put_usz32(sections.len());
         for s in &sections {
             blob.write_u16::<LE>(s.kind);
             blob.write(&[0u8; 2]); // unused
-            blob.write_u32::<LE>(s.n.to_u32().unwrap());
-            blob.write_u32::<LE>(s.pos);
+            blob.put_usz32(s.n);
+            blob.put_u32(s.pos);
         }
 
         //-- Fill remaining slots related to file size
