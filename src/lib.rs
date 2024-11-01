@@ -272,7 +272,7 @@ impl Dex {
             // FIXME: MUTF-8: encode U+0000 as hex: C0 80
             // FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
             // FIXME: length *in UTF-16 code units*, as ULEB128
-            blob.put_uleb128(s.len().to_u32().unwrap());
+            blob.put_uszleb128(s.len());
             blob.write(s.as_bytes());
             blob.put_u8(0u8); // string-terminator NULL byte
         }
@@ -288,9 +288,9 @@ impl Dex {
                 &empty
             };
             blob.put_uleb128(0u32); // TODO: static_fields_size
-            blob.put_uleb128(d.instance_fields.len().to_u32().unwrap());
-            blob.put_uleb128(d.direct_methods.len().to_u32().unwrap());
-            blob.put_uleb128(d.virtual_methods.len().to_u32().unwrap());
+            blob.put_uszleb128(d.instance_fields.len());
+            blob.put_uszleb128(d.direct_methods.len());
+            blob.put_uszleb128(d.virtual_methods.len());
             // TODO: static_fields
             self.render_encoded_fields(&mut blob, &d.instance_fields);
             self.render_encoded_methods(&mut blob, d.direct_methods.clone(), &code_offsets);
@@ -374,8 +374,8 @@ impl Dex {
                     for a in &m.annotations {
                         blob.push(a.visibility as u8);
                         let ea = &a.encoded_annotation;
-                        blob.put_uleb128(self.types.rank(&ea.typ).to_u32().unwrap());
-                        blob.put_uleb128(ea.elems.len().to_u32().unwrap());
+                        blob.put_uszleb128(self.types.rank(&ea.typ));
+                        blob.put_uszleb128(ea.elems.len());
                         for el in &ea.elems {
                             blob.put_uleb128(string_ids[self.strings[&el.name]]);
                             self.render_encoded_value(&mut blob, &el.value);
@@ -529,7 +529,7 @@ impl Dex {
         let mut prev = 0;
         for f in fields {
             let idx = self.fields.rank(&f.f);
-            blob.put_uleb128((idx - prev).to_u32().unwrap());
+            blob.put_uszleb128(idx - prev);
             prev = idx;
             blob.put_uleb128(f.access.bits());
         }
@@ -545,7 +545,7 @@ impl Dex {
         let mut prev = 0;
         for m in methods {
             let idx = self.methods.rank(&m.m);
-            blob.put_uleb128((idx - prev).to_u32().unwrap());
+            blob.put_uszleb128(idx - prev);
             prev = idx;
             blob.put_uleb128(m.access.bits());
             use crate::Access::*;
@@ -567,7 +567,7 @@ impl Dex {
             }
             Array(elems) => {
                 blob.push(ev_hdr(0x1c, 0));
-                blob.put_uleb128(elems.len().to_u32().unwrap());
+                blob.put_uszleb128(elems.len());
                 for el in elems {
                     self.render_encoded_value(blob, &el);
                 }

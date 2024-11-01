@@ -16,6 +16,7 @@ pub trait VecU8Ext {
     fn put_usz16(&mut self, v: usize);
     fn put_u32(&mut self, v: u32);
     fn put_usz32(&mut self, v: usize);
+    fn put_uszleb128(&mut self, v: usize);
     fn put_uleb128(&mut self, v: u32);
     fn slot32(&mut self) -> Slot32;
     fn set(&mut self, slot: Slot32, v: u32);
@@ -63,6 +64,10 @@ impl VecU8Ext for Vec<u8> {
 
     fn put_usz32(&mut self, v: usize) {
         self.put_u32(v.try_into().unwrap());
+    }
+
+    fn put_uszleb128(&mut self, v: usize) {
+        self.put_uleb128(v.try_into().unwrap());
     }
 
     /// Writes an uint32 in ULEB128 format
