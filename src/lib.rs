@@ -106,22 +106,22 @@ impl Dex {
         let sha1_sum_pos = blob.len();
         blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
         let file_size = blob.slot32();
-        blob.write(&0x70u32.to_le_bytes()); // Header size
-        blob.write(&0x12345678u32.to_le_bytes()); // Endian constant
-        blob.write(&0u32.to_le_bytes()); // link_size
-        blob.write(&0u32.to_le_bytes()); // link_off
+        blob.put_u32(0x70); // Header size
+        blob.put_u32(0x12345678); // Endian constant
+        blob.put_u32(0); // link_size
+        blob.put_u32(0); // link_off
         let map_offset = blob.slot32();
-        blob.write(&self.strings.len().to_u32().unwrap().to_le_bytes());
+        blob.put_usz32(self.strings.len());
         let string_ids_off = blob.slot32();
-        blob.write(&self.types.len().to_u32().unwrap().to_le_bytes());
+        blob.put_usz32(self.types.len());
         let type_ids_off = blob.slot32();
-        blob.write(&self.prototypes.len().to_u32().unwrap().to_le_bytes());
+        blob.put_usz32(self.prototypes.len());
         let proto_ids_off = blob.slot32();
-        blob.write(&self.fields.len().to_u32().unwrap().to_le_bytes());
+        blob.put_usz32(self.fields.len());
         let field_ids_off = blob.slot32();
-        blob.write(&self.methods.len().to_u32().unwrap().to_le_bytes());
+        blob.put_usz32(self.methods.len());
         let method_ids_off = blob.slot32();
-        blob.write(&self.classes.len().to_u32().unwrap().to_le_bytes());
+        blob.put_usz32(self.classes.len());
         let class_defs_off = blob.slot32();
         let data_size = blob.slot32();
         let data_off = blob.slot32();
