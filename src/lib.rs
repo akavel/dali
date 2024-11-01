@@ -81,6 +81,25 @@ impl Dex {
     pub fn render(&self) -> Vec<u8> {
         let mut blob: Vec<u8> = vec![];
 
+        // Storage for offsets where various sections of the file
+        // start. Will be needed to render map_list.
+        // NOTE: n is number of elements in the section, not length in bytes.
+        struct Section {
+            kind: u16,
+            pos: u32,
+            n: usize,
+        }
+        fn section(kind: u16, pos: u32, n: usize) -> Section {
+            Section { kind, pos, n }
+        }
+        let mut sections = Vec::<Section>::new();
+
+        // FIXME: ensure correct padding everywhere
+
+        //-- Partially render header
+        // Most of it can only be calculated after the rest of the segments.
+        sections.push(section(0x0000, blob.pos(), 1));
+        // TODO: handle various versions of targetSdkVersion file, not only 035
         write!(blob, "dex\n035\x00");
         blob.write(&[0u8; 4]); // FIXME: adler_sum slot32
         blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
@@ -108,14 +127,14 @@ impl Dex {
         //-- Partially render string_ids
         // We preallocate space for the list of string offsets. We cannot fill it yet, as its
         // contents will depend on the size of the other segments.
-        //FIXME: sections.add (0x0001'u16, blob.pos, dex.strings.len)
+        sections.push(section(0x0001, blob.pos(), self.strings.len()));
         //FIXME: blob[slots.stringIdsOff] = blob.pos
         for i in 0..self.strings.len() {
             blob.write(&[0u8; 4]); // FIXME: string_offs[i] slot32
         }
 
         //-- Render typeIDs.
-        //FIXME: sections.add (0x0002'u16, blob.pos, dex.types.len)
+        sections.push(section(0x0002, blob.pos(), self.types.len()));
         //FIXME: blob[slots.typeIdsOff] = blob.pos
         let string_ids = self.strings_ordering();
         // self.types are already stored sorted, same as self.strings, so we don't need
@@ -127,7 +146,7 @@ impl Dex {
         //-- Partially render proto IDs.
         // We cannot fill offsets for parameters (type lists), as they'll depend on the size of the
         // segments inbetween.
-        //FIXME: sections.add (0x0003'u16, blob.pos, dex.prototypes.len)
+        sections.push(section(0x0003, blob.pos(), self.prototypes.len()));
         //FIXME: blob[slots.protoIdsOff] = blob.pos
         for p in &self.prototypes {
             let desc = &p.descriptor();
@@ -138,7 +157,7 @@ impl Dex {
 
         //-- Render field IDs
         if self.fields.len() > 0 {
-            //FIXME: sections.add (0x0004'u16, blob.pos, dex.fields.len)
+            sections.push(section(0x0004, blob.pos(), self.fields.len()));
             //FIXME: blob[slots.fieldIdsOff] = blob.pos
         }
         for f in &self.fields {
@@ -148,7 +167,7 @@ impl Dex {
         }
 
         //-- Render method IDs
-        //FIXME: sections.add (0x0005'u16, blob.pos, dex.methods.len)
+        sections.push(section(0x0005, blob.pos(), self.methods.len()));
         //FIXME: if dex.methods.len > 0:
         //FIXME:   blob[slots.methodIdsOff] = blob.pos
         for m in &self.methods {
@@ -158,7 +177,7 @@ impl Dex {
         }
 
         //-- Partially render class defs.
-        //FIXME: sections.add (0x0006'u16, blob.pos, dex.classes.len)
+        sections.push(section(0x0006, blob.pos(), self.classes.len()));
         //FIXME: blob[slots.classDefsOff] = blob.pos
         let mut annotation_data_offsets = Slots32::<Type>::new();
         const NO_INDEX: u32 = 0xffff_ffff;
@@ -194,7 +213,7 @@ impl Dex {
         }
 
         //-- Render code items
-        //FIXME: let dataStart = blob.pos
+        let data_start = blob.pos();
         //FIXME: blob[slots.dataOff] = dataStart
         let mut code_items = 0;
         let mut code_offsets = BTreeMap::<Method, u32>::new();
@@ -220,13 +239,14 @@ impl Dex {
             }
         }
         if code_items > 0 {
-            //FIXME: sections.add (0x2001'u16, dataStart, codeItems)
+            sections.push(section(0x2001, data_start, code_items));
         }
 
         //-- Render type lists
         blob.pad32();
-        //FIXME: if dex.typeLists.len > 0:
-        //FIXME:   sections.add (0x1001'u16, blob.pos, dex.typeLists.len)
+        if self.type_lists.len() > 0 {
+            sections.push(section(0x1001, blob.pos(), self.type_lists.len()));
+        }
         for l in &self.type_lists {
             blob.pad32();
             //FIXME: typeListOffsets.setAll(l, blob.pos, blob)
@@ -237,7 +257,7 @@ impl Dex {
         }
 
         //-- Render strings data
-        //FIXME: sections.add (0x2002'u16, blob.pos, dex.strings.len)
+        sections.push(section(0x2002, blob.pos(), self.strings.len()));
         for s in self.strings_as_added() {
             //FIXME: let slot = slots.stringOffsets[stringIds[dex.strings[s]]]
             //FIXME: blob[slot] = blob.pos
@@ -250,7 +270,7 @@ impl Dex {
         }
 
         //-- Render class data
-        //FIXME: sections.add (0x2000'u16, blob.pos, dex.classes.len)
+        sections.push(section(0x2000, blob.pos(), self.classes.len()));
         for c in &self.classes {
             //FIXME: classDataOffsets.setAll(c.class, blob.pos, blob)
             let empty = ClassData::default();
@@ -272,7 +292,7 @@ impl Dex {
         //-- Render annotations data
         if annotation_data_offsets.len() > 0 {
             blob.pad32();
-            //FIXME: sections.add (0x2006'u16, blob.pos, annotationDataOffsets.len)
+            sections.push(section(0x2006, blob.pos(), annotation_data_offsets.len()));
         }
         let mut method_annotation_sets_offsets = Slots32::<Method>::new();
         for c in &self.classes {
@@ -300,9 +320,13 @@ impl Dex {
         }
         if method_annotation_sets_offsets.len() > 0 {
             blob.pad32();
-            //FIXME: sections.add (0x1003'u16, blob.pos, methodAnnotationSetsOffsets.len)
+            sections.push(section(
+                0x1003,
+                blob.pos(),
+                method_annotation_sets_offsets.len(),
+            ));
         }
-        //FIXME: var methodAnnotationsOffsets: Slots32[tuple[m: MethodTuple, i: int]]
+        let mut method_annotations_offsets = Slots32::<(Method, usize)>::new();
         for c in &self.classes {
             let Some(ref cd) = c.class_data else {
                 continue;
@@ -318,11 +342,16 @@ impl Dex {
                 }
                 method_annotation_sets_offsets.set_all_here(&m.m, &mut blob);
                 blob.write_u32::<LE>(m.annotations.len().to_u32().unwrap());
-                //FIXME: method_annotation_offsets.insert((&m.m, i), blob.slot32());
+                method_annotations_offsets.insert((m.m.clone(), i), blob.slot32());
             }
-            //FIXME: if methodAnnotationsOffsets.len > 0:
-            //FIXME:   # TODO: [LATER] other kinds of annotations
-            //FIXME:   sections.add (0x2004'u16, blob.pos, methodAnnotationsOffsets.len)
+            if method_annotations_offsets.len() > 0 {
+                // TODO: [LATER] other kinds of annotations
+                sections.push(section(
+                    0x2004,
+                    blob.pos(),
+                    method_annotations_offsets.len(),
+                ));
+            }
             for c in &self.classes {
                 let Some(ref cd) = c.class_data else {
                     continue;
@@ -346,6 +375,18 @@ impl Dex {
                     }
                 }
             }
+        }
+
+        //-- Render map_list
+        blob.pad32();
+        sections.push(section(0x1000, blob.pos(), 1));
+        //FIXME: blob[slots.mapOffset] = blob.pos
+        blob.write_u32::<LE>(sections.len().to_u32().unwrap());
+        for s in &sections {
+            blob.write_u16::<LE>(s.kind);
+            blob.write(&[0u8; 2]); // unused
+            blob.write_u32::<LE>(s.n.to_u32().unwrap());
+            blob.write_u32::<LE>(s.pos);
         }
 
         blob

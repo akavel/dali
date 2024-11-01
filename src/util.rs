@@ -7,6 +7,7 @@ use num::ToPrimitive;
 use u4::{u4, U4x2, U4};
 
 pub trait VecU8Ext {
+    fn pos(&self) -> u32;
     fn pad32(&mut self);
     fn put_u4(&mut self, v: U4, high: &mut bool);
     fn put_uleb128(&mut self, v: u32);
@@ -15,6 +16,10 @@ pub trait VecU8Ext {
 }
 
 impl VecU8Ext for Vec<u8> {
+    fn pos(&self) -> u32 {
+        self.len().to_u32().unwrap()
+    }
+
     fn pad32(&mut self) {
         let n = (4 - (self.len() % 4)) % 4;
         self.write(&vec![0u8; n]);
