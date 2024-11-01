@@ -104,6 +104,7 @@ impl Dex {
         // TODO: handle various versions of targetSdkVersion file, not only 035
         write!(blob, "dex\n035\x00");
         let adler_sum = blob.slot32();
+        let sha1_sum_pos = blob.len();
         blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
         let file_size = blob.slot32();
         blob.write(&0x70u32.to_le_bytes()); // Header size
@@ -402,6 +403,9 @@ impl Dex {
         blob.set(file_size, blob.pos());
         //-- Fill checksums
         //FIXME
+        let mut sha1 = sha1_smol::Sha1::new();
+        sha1.update(&blob[0x20..]);
+        blob.splice(sha1_sum_pos..sha1_sum_pos + 20, sha1.digest().bytes());
         blob.set(adler_sum, adler32(&blob[0x0c..]));
 
         blob
