@@ -8,6 +8,12 @@ pub fn return_void() -> Instr {
     }
 }
 
+pub fn const_high16(reg: u8, high_bits: u16) -> Instr {
+    Instr {
+        opcode: 0x15,
+        args: vec![RegXX(reg), RawXXXX(high_bits)],
+    }
+}
 pub fn const_string(reg: u8, s: String) -> Instr {
     Instr {
         opcode: 0x1a,
@@ -23,8 +29,31 @@ pub fn sget_object(reg: u8, field: Field) -> Instr {
 }
 
 pub fn invoke_virtual2(reg_c: U4, reg_d: U4, m: Method) -> Instr {
+    invoke2(0x6e, reg_c, reg_d, m)
+}
+
+pub fn invoke_super2(reg_c: U4, reg_d: U4, m: Method) -> Instr {
+    invoke2(0x6f, reg_c, reg_d, m)
+}
+
+pub fn invoke_direct1(reg_c: U4, m: Method) -> Instr {
     Instr {
-        opcode: 0x6e,
+        opcode: 0x70,
+        args: vec![
+            RawX(u4!(1)),
+            RawX(u4!(0)),
+            MethodXXXX(m),
+            RawX(u4!(0)),
+            RegX(reg_c),
+            RawXX(0),
+        ],
+    }
+}
+
+// helper
+fn invoke2(opcode: u8, reg_c: U4, reg_d: U4, m: Method) -> Instr {
+    Instr {
+        opcode,
         args: vec![
             RawX(u4!(2)),
             RawX(u4!(0)),

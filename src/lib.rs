@@ -674,6 +674,113 @@ mod tests {
         );
     }
 
+    #[test]
+    fn synthesized_hello_android_apk() {
+        let mut dex = Dex::new();
+        // Prime some arrays, to make sure their order matches hello_android_apk
+        dex.add_str(&"<init>".to_owned());
+        dex.add_str(&"I".to_owned());
+        dex.add_str(&"Landroid/app/Activity;".to_owned());
+        dex.add_str(&"Landroid/os/Bundle;".to_owned());
+        dex.add_str(&"Lcom/android/hello/HelloAndroid;".to_owned());
+        dex.add_str(&"V".to_owned());
+        dex.add_str(&"VI".to_owned());
+        dex.add_str(&"VL".to_owned());
+        dex.add_str(&"onCreate".to_owned());
+        dex.add_str(&"setContentView".to_owned());
+        dex.add_type_list(&vec!["I".to_owned()]);
+
+        dex.add_class(ClassDef {
+            class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+            access: Access::Public.into(),
+            superclass: Some("Landroid/app/Activity;".to_owned()),
+            interfaces: vec![],
+            class_data: Some(ClassData {
+                direct_methods: vec![EncodedMethod {
+                    m: Method {
+                        class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+                        name: "<init>".to_owned(),
+                        prototype: Prototype {
+                            ret: "V".to_owned(),
+                            params: vec![],
+                        },
+                    },
+                    access: Access::Public | Access::Constructor,
+                    annotations: vec![],
+                    code: Some(Code {
+                        registers: 1,
+                        ins: 1,
+                        outs: 1,
+                        instrs: vec![
+                            invoke_direct1(
+                                u4!(0),
+                                Method {
+                                    class: "Landroid/app/Activity;".to_owned(),
+                                    name: "<init>".to_owned(),
+                                    prototype: Prototype {
+                                        ret: "V".to_owned(),
+                                        params: vec![],
+                                    },
+                                },
+                            ),
+                            return_void(),
+                        ],
+                    }),
+                }],
+                virtual_methods: vec![EncodedMethod {
+                    m: Method {
+                        class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+                        name: "onCreate".to_owned(),
+                        prototype: Prototype {
+                            ret: "V".to_owned(),
+                            params: vec!["Landroid/os/Bundle;".to_owned()],
+                        },
+                    },
+                    access: Access::Public.into(),
+                    annotations: vec![],
+                    code: Some(Code {
+                        registers: 3,
+                        ins: 2,
+                        outs: 2,
+                        instrs: vec![
+                            invoke_super2(
+                                u4!(1),
+                                u4!(2),
+                                Method {
+                                    class: "Landroid/app/Activity;".to_owned(),
+                                    name: "onCreate".to_owned(),
+                                    prototype: Prototype {
+                                        ret: "V".to_owned(),
+                                        params: vec!["Landroid/os/Bundle;".to_owned()],
+                                    },
+                                },
+                            ),
+                            const_high16(0, 0x7f03),
+                            invoke_virtual2(
+                                u4!(1),
+                                u4!(0),
+                                Method {
+                                    class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+                                    name: "setContentView".to_owned(),
+                                    prototype: Prototype {
+                                        ret: "V".to_owned(),
+                                        params: vec!["I".to_owned()],
+                                    },
+                                },
+                            ),
+                            return_void(),
+                        ],
+                    }),
+                }],
+                ..Default::default()
+            }),
+        });
+        assert_eq!(
+            pretty_hex(&dex.render()),
+            pretty_hex(&parse_hex(HELLO_ANDROID_APK_HEXDUMP)),
+        );
+    }
+
     const HELLO_WORLD_APK_HEXDUMP: &str = "
 .d .e .x 0A .0 .3 .5 00  6F 53 89 BC 1E 79 B2 4F
 1F 9C 09 66 15 23 2D 3B  56 65 32 C3 B5 81 B4 5A
