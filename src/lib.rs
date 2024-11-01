@@ -213,10 +213,10 @@ impl Dex {
             if has_annotations {
                 annotation_data_offsets.insert(c.class.clone(), blob.slot32());
             } else {
-                blob.write(&[0u8; 4]);
+                blob.put_u32(0);
             }
             class_data_offsets.insert(c.class.clone(), blob.slot32());
-            blob.write(&[0u8; 4]); // TODO: static_values
+            blob.put_u32(0); // TODO: static_values
         }
 
         //-- Render code items
@@ -392,7 +392,7 @@ impl Dex {
         blob.put_usz32(sections.len());
         for s in &sections {
             blob.put_u16(s.kind);
-            blob.write(&[0u8; 2]); // unused
+            blob.put_u16(0); // unused
             blob.put_usz32(s.n);
             blob.put_u32(s.pos);
         }
