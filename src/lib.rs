@@ -240,9 +240,10 @@ impl Dex {
                 blob.write_u16::<LE>(code.outs);
                 blob.write_u16::<LE>(0u16); // TODO: tries_size
                 blob.write_u32::<LE>(0u32); // TODO: debug_info_off
-                blob.write(&[0u8; 4]); // FIXME: slot   # This shall be filled with size of instrs, in 16-bit code units
+                let slot_off = blob.pos();
+                let slot = blob.slot32(); // Shall be filled with size of instrs, in 16-bit code units
                 self.render_instrs(&mut blob, &code.instrs, &string_ids);
-                //FIXME: blob[slot] = (blob.pos - slot.uint32 - 4) div 2
+                blob.set(slot, (blob.pos() - slot_off - 4) / 2);
             }
         }
         if code_items > 0 {
