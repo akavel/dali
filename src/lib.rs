@@ -196,6 +196,7 @@ impl Dex {
         //FIXME: let dataStart = blob.pos
         //FIXME: blob[slots.dataOff] = dataStart
         let mut code_items = 0;
+        let mut code_offsets = BTreeMap::<Method, u32>::new();
         for c in &self.classes {
             let Some(ref cd) = c.class_data else {
                 continue;
@@ -206,7 +207,7 @@ impl Dex {
                 };
                 code_items += 1;
                 blob.pad32();
-                //FIXME: codeOffsets[em.m.asTuple] = blob.pos
+                code_offsets.insert(m.m.clone(), blob.len().to_u32().unwrap());
                 blob.write_u16::<LE>(code.registers);
                 blob.write_u16::<LE>(code.ins);
                 blob.write_u16::<LE>(code.outs);
@@ -245,6 +246,26 @@ impl Dex {
             blob.put_uleb128(s.len().to_u32().unwrap());
             blob.write(s.as_bytes());
             blob.write_u8(0u8); // string-terminator NULL byte
+        }
+
+        //-- Render class data
+        //FIXME: sections.add (0x2000'u16, blob.pos, dex.classes.len)
+        for c in &self.classes {
+            //FIXME: classDataOffsets.setAll(c.class, blob.pos, blob)
+            let empty = ClassData::default();
+            let d = if let Some(ref d) = c.class_data {
+                d
+            } else {
+                &empty
+            };
+            blob.put_uleb128(0u32); // TODO: static_fields_size
+            blob.put_uleb128(d.instance_fields.len().to_u32().unwrap());
+            blob.put_uleb128(d.direct_methods.len().to_u32().unwrap());
+            blob.put_uleb128(d.virtual_methods.len().to_u32().unwrap());
+            // TODO: static_fields
+            self.render_encoded_fields(&mut blob, &d.instance_fields);
+            self.render_encoded_methods(&mut blob, d.direct_methods.clone(), &code_offsets);
+            self.render_encoded_methods(&mut blob, d.virtual_methods.clone(), &code_offsets);
         }
 
         blob
@@ -347,6 +368,38 @@ impl Dex {
                         blob.write_u16::<LE>(self.methods.rank(v).to_u16().unwrap());
                     }
                 }
+            }
+        }
+    }
+
+    fn render_encoded_fields(&self, blob: &mut Vec<u8>, fields: &Vec<EncodedField>) {
+        let mut prev = 0;
+        for f in fields {
+            let idx = self.fields.rank(&f.f);
+            blob.put_uleb128((idx - prev).to_u32().unwrap());
+            prev = idx;
+            blob.put_uleb128(f.access.bits());
+        }
+    }
+
+    fn render_encoded_methods(
+        &self,
+        blob: &mut Vec<u8>,
+        mut methods: Vec<EncodedMethod>,
+        code_offsets: &BTreeMap<Method, u32>,
+    ) {
+        methods.sort_by(|a, b| a.m.cmp(&b.m));
+        let mut prev = 0;
+        for m in methods {
+            let idx = self.methods.rank(&m.m);
+            blob.put_uleb128((idx - prev).to_u32().unwrap());
+            prev = idx;
+            blob.put_uleb128(m.access.bits());
+            use crate::Access::*;
+            if m.access.intersects(Native | Abstract) {
+                blob.put_uleb128(0u32);
+            } else {
+                blob.put_uleb128(code_offsets[&m.m]);
             }
         }
     }

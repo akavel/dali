@@ -48,6 +48,7 @@ pub struct EncodedField {
     pub access: BitFlags<Access>,
 }
 
+#[derive(Clone)]
 pub struct EncodedMethod {
     pub m: Method,
     pub access: BitFlags<Access>,
@@ -55,20 +56,24 @@ pub struct EncodedMethod {
     pub code: Option<Code>,
 }
 
+#[derive(Clone)]
 pub struct AnnotationItem {
     pub visibility: Visibility,
     pub encoded_annotation: EncodedAnnotation,
 }
 
+#[derive(Clone)]
 pub enum Visibility {
     System = 0x02,
 }
 
+#[derive(Clone)]
 pub struct EncodedAnnotation {
     pub typ: Type,
     pub elems: Vec<AnnotationElement>,
 }
 
+#[derive(Clone)]
 pub struct AnnotationElement {
     pub name: String,
     pub value: EncodedValue,
@@ -111,6 +116,7 @@ impl Prototype {
     }
 }
 
+#[derive(Clone)]
 pub struct Instr {
     pub opcode: u8,
     // NOTE: We're assuming little endian encoding of the
@@ -123,6 +129,7 @@ pub struct Instr {
     pub args: Vec<Arg>,
 }
 
+#[derive(Clone)]
 pub struct Code {
     pub registers: u16,
     pub ins: u16,
@@ -132,6 +139,7 @@ pub struct Code {
     pub instrs: Vec<Instr>,
 }
 
+#[derive(Clone)]
 pub enum Arg {
     RawX(U4),
     RawXX(u8),
@@ -144,6 +152,7 @@ pub enum Arg {
     MethodXXXX(Method),
 }
 
+#[derive(Clone)]
 pub enum EncodedValue {
     Type(Type),
     Array(Vec<EncodedValue>),
