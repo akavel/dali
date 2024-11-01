@@ -10,6 +10,10 @@ pub trait VecU8Ext {
     fn pos(&self) -> u32;
     fn pad32(&mut self);
     fn put_u4(&mut self, v: U4, high: &mut bool);
+    fn put_u8(&mut self, v: u8);
+    fn put_u16(&mut self, v: u16);
+    fn put_u3216(&mut self, v: u32);
+    fn put_usz16(&mut self, v: usize);
     fn put_u32(&mut self, v: u32);
     fn put_usz32(&mut self, v: usize);
     fn put_uleb128(&mut self, v: u32);
@@ -35,6 +39,22 @@ impl VecU8Ext for Vec<u8> {
             self[i] = U4x2::from_byte(self[i]).with_right(v).packed;
         }
         *high = !*high;
+    }
+
+    fn put_u8(&mut self, v: u8) {
+        self.push(v);
+    }
+
+    fn put_u16(&mut self, v: u16) {
+        self.write(&v.to_le_bytes());
+    }
+
+    fn put_u3216(&mut self, v: u32) {
+        self.put_u16(v.try_into().unwrap());
+    }
+
+    fn put_usz16(&mut self, v: usize) {
+        self.put_u16(v.try_into().unwrap());
     }
 
     fn put_u32(&mut self, v: u32) {

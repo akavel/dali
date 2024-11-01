@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::io::Write;
 
-use byteorder::{WriteBytesExt, LE};
 use indexset::BTreeSet;
 use num::ToPrimitive;
 
@@ -167,8 +166,8 @@ impl Dex {
             blob.set(field_ids_off, blob.pos());
         }
         for f in &self.fields {
-            blob.write_u16::<LE>(self.types.rank(&f.class).to_u16().unwrap());
-            blob.write_u16::<LE>(self.types.rank(&f.typ).to_u16().unwrap());
+            blob.put_usz16(self.types.rank(&f.class));
+            blob.put_usz16(self.types.rank(&f.typ));
             blob.put_u32(string_ids[self.strings[&f.name]]);
         }
 
@@ -178,8 +177,8 @@ impl Dex {
             blob.set(method_ids_off, blob.pos());
         }
         for m in &self.methods {
-            blob.write_u16::<LE>(self.types.rank(&m.class).to_u16().unwrap());
-            blob.write_u16::<LE>(self.prototypes.rank(&m.prototype).to_u16().unwrap());
+            blob.put_usz16(self.types.rank(&m.class));
+            blob.put_usz16(self.prototypes.rank(&m.prototype));
             blob.put_u32(string_ids[self.strings[&m.name]]);
         }
 
@@ -236,10 +235,10 @@ impl Dex {
                 code_items += 1;
                 blob.pad32();
                 code_offsets.insert(m.m.clone(), blob.len().to_u32().unwrap());
-                blob.write_u16::<LE>(code.registers);
-                blob.write_u16::<LE>(code.ins);
-                blob.write_u16::<LE>(code.outs);
-                blob.write_u16::<LE>(0u16); // TODO: tries_size
+                blob.put_u16(code.registers);
+                blob.put_u16(code.ins);
+                blob.put_u16(code.outs);
+                blob.put_u16(0u16); // TODO: tries_size
                 blob.put_u32(0u32); // TODO: debug_info_off
                 let slot_off = blob.pos();
                 let slot = blob.slot32(); // Shall be filled with size of instrs, in 16-bit code units
@@ -261,7 +260,7 @@ impl Dex {
             type_list_offs.set_all_here(l, &mut blob);
             blob.put_usz32(l.len());
             for t in l {
-                blob.write_u16::<LE>(self.types.rank(t).to_u16().unwrap());
+                blob.put_usz16(self.types.rank(t));
             }
         }
 
@@ -275,7 +274,7 @@ impl Dex {
             // FIXME: length *in UTF-16 code units*, as ULEB128
             blob.put_uleb128(s.len().to_u32().unwrap());
             blob.write(s.as_bytes());
-            blob.write_u8(0u8); // string-terminator NULL byte
+            blob.put_u8(0u8); // string-terminator NULL byte
         }
 
         //-- Render class data
@@ -392,7 +391,7 @@ impl Dex {
         blob.set(map_offset, blob.pos());
         blob.put_usz32(sections.len());
         for s in &sections {
-            blob.write_u16::<LE>(s.kind);
+            blob.put_u16(s.kind);
             blob.write(&[0u8; 2]); // unused
             blob.put_usz32(s.n);
             blob.put_u32(s.pos);
@@ -495,7 +494,7 @@ impl Dex {
     fn render_instrs(&self, blob: &mut Vec<u8>, instrs: &Vec<Instr>, string_ids: &Vec<u32>) {
         let mut high = true;
         for instr in instrs {
-            blob.write_u8(instr.opcode);
+            blob.put_u8(instr.opcode);
             for arg in &instr.args {
                 // FIXME: padding
                 use crate::Arg::*;
@@ -507,19 +506,19 @@ impl Dex {
                         blob.push(*v);
                     }
                     RawXXXX(v) => {
-                        blob.write_u16::<LE>(*v);
+                        blob.put_u16(*v);
                     }
                     FieldXXXX(v) => {
-                        blob.write_u16::<LE>(self.fields.rank(v).to_u16().unwrap());
+                        blob.put_usz16(self.fields.rank(v));
                     }
                     StringXXXX(v) => {
-                        blob.write_u16::<LE>(string_ids[self.strings[v]].to_u16().unwrap());
+                        blob.put_u3216(string_ids[self.strings[v]]);
                     }
                     TypeXXXX(v) => {
-                        blob.write_u16::<LE>(self.types.rank(v).to_u16().unwrap());
+                        blob.put_usz16(self.types.rank(v));
                     }
                     MethodXXXX(v) => {
-                        blob.write_u16::<LE>(self.methods.rank(v).to_u16().unwrap());
+                        blob.put_usz16(self.methods.rank(v));
                     }
                 }
             }
