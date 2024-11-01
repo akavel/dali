@@ -131,8 +131,10 @@ impl Dex {
         // contents will depend on the size of the other segments.
         sections.push(section(0x0001, blob.pos(), self.strings.len()));
         blob.set(string_ids_off, blob.pos());
+        // TODO[LATER]: refactor to some nicer functional expression maybe
+        let mut string_offs = BTreeMap::<u32, Slot32>::new();
         for i in 0..self.strings.len() {
-            blob.write(&[0u8; 4]); // FIXME: string_offs[i] slot32
+            string_offs.insert(i.to_u32().unwrap(), blob.slot32());
         }
 
         //-- Render typeIDs.
@@ -262,8 +264,8 @@ impl Dex {
         //-- Render strings data
         sections.push(section(0x2002, blob.pos(), self.strings.len()));
         for s in self.strings_as_added() {
-            //FIXME: let slot = slots.stringOffsets[stringIds[dex.strings[s]]]
-            //FIXME: blob[slot] = blob.pos
+            let slot = string_offs.remove(&string_ids[self.strings[&s]]).unwrap();
+            blob.set(slot, blob.pos());
             // FIXME: MUTF-8: encode U+0000 as hex: C0 80
             // FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
             // FIXME: length *in UTF-16 code units*, as ULEB128
