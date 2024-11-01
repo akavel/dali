@@ -103,7 +103,7 @@ impl Dex {
         sections.push(section(0x0000, blob.pos(), 1));
         // TODO: handle various versions of targetSdkVersion file, not only 035
         write!(blob, "dex\n035\x00");
-        blob.write(&[0u8; 4]); // FIXME: adler_sum slot32
+        let adler_sum = blob.slot32();
         blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
         let file_size = blob.slot32();
         blob.write(&0x70u32.to_le_bytes()); // Header size
@@ -402,6 +402,7 @@ impl Dex {
         blob.set(file_size, blob.pos());
         //-- Fill checksums
         //FIXME
+        blob.set(adler_sum, adler32(&blob[0x0c..]));
 
         blob
     }
@@ -588,6 +589,18 @@ fn ev_uint(v: u32) -> Vec<u8> {
         0x1_0000..=0xff_ffff => bytes[..3].iter().map(|v| *v).collect(),
         0x100_0000..=0xffff_ffff => bytes.iter().map(|v| *v).collect(),
     }
+}
+
+/// https://en.wikipedia.org/wiki/Adler-32
+fn adler32(s: &[u8]) -> u32 {
+    let mut a = 1u32;
+    let mut b = 0u32;
+    const MOD_ADLER: u32 = 65521;
+    for c in s {
+        a = (a + *c as u32) % MOD_ADLER;
+        b = (b + a) % MOD_ADLER;
+    }
+    (b << 16) | a
 }
 
 #[cfg(test)]
