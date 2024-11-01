@@ -41,7 +41,9 @@ impl Dex {
         if let Some(ref t) = c.superclass {
             self.add_type(t);
         }
-        // FIXME: if c.interfaces.len() > 0...
+        if c.interfaces.len() > 0 {
+            self.add_type_list(&c.interfaces);
+        }
         if let Some(ref cd) = c.class_data {
             for f in &cd.instance_fields {
                 self.add_field(&f.f);
@@ -52,7 +54,7 @@ impl Dex {
                     self.add_type(&a.encoded_annotation.typ);
                     for el in &a.encoded_annotation.elems {
                         self.add_str(&el.name);
-                        // FIXME: self.add_enc_value(el.value);
+                        self.add_encoded_value(&el.value);
                     }
                 }
                 let Some(ref code) = m.code else {
@@ -103,7 +105,7 @@ impl Dex {
         write!(blob, "dex\n035\x00");
         blob.write(&[0u8; 4]); // FIXME: adler_sum slot32
         blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
-        blob.write(&[0u8; 4]); // FIXME: file_size slot32
+        let file_size = blob.slot32();
         blob.write(&0x70u32.to_le_bytes()); // Header size
         blob.write(&0x12345678u32.to_le_bytes()); // Endian constant
         blob.write(&0u32.to_le_bytes()); // link_size
@@ -121,7 +123,7 @@ impl Dex {
         blob.write(&[0u8; 4]); // FIXME: method_ids_off slot32
         blob.write(&self.classes.len().to_u32().unwrap().to_le_bytes());
         blob.write(&[0u8; 4]); // FIXME: class_defs_off slot32
-        blob.write(&[0u8; 4]); // FIXME: data_size slot32
+        let data_size = blob.slot32();
         blob.write(&[0u8; 4]); // FIXME: data_off slot32
 
         //-- Partially render string_ids
@@ -389,7 +391,27 @@ impl Dex {
             blob.write_u32::<LE>(s.pos);
         }
 
+        //-- Fill remaining slots related to file size
+        blob.set(data_size, blob.pos() - data_start); // FIXME: round to 64?
+        blob.set(file_size, blob.pos());
+        //-- Fill checksums
+        //FIXME
+
         blob
+    }
+
+    fn add_encoded_value(&mut self, v: &EncodedValue) {
+        use crate::EncodedValue::*;
+        match v {
+            Array(elems) => {
+                for e in elems {
+                    self.add_encoded_value(e);
+                }
+            }
+            Type(typ) => {
+                self.add_type(typ);
+            }
+        }
     }
 
     fn add_field(&mut self, f: &Field) {
