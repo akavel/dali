@@ -62,7 +62,8 @@ pub struct AnnotationItem {
     pub encoded_annotation: EncodedAnnotation,
 }
 
-#[derive(Clone)]
+#[repr(u8)]
+#[derive(Copy, Clone)]
 pub enum Visibility {
     System = 0x02,
 }

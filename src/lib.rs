@@ -274,7 +274,7 @@ impl Dex {
             blob.pad32();
             //FIXME: sections.add (0x2006'u16, blob.pos, annotationDataOffsets.len)
         }
-        //FIXME: var methodAnnotationSetsOffsets: Slots32[MethodTuple]
+        let mut method_annotation_sets_offsets = Slots32::<Method>::new();
         for c in &self.classes {
             if !annotation_data_offsets.contains(&c.class) {
                 continue;
@@ -293,10 +293,59 @@ impl Dex {
                     continue;
                 }
                 blob.write_u32::<LE>(self.methods.rank(&m.m).to_u32().unwrap());
-                blob.write(&[0u8; 4]); // FIXME: methodAnnotationSetsOffsets
+                method_annotation_sets_offsets.insert(m.m.clone(), blob.slot32());
                 n_methods += 1;
             }
             blob.set(n_methods_slot, n_methods);
+        }
+        if method_annotation_sets_offsets.len() > 0 {
+            blob.pad32();
+            //FIXME: sections.add (0x1003'u16, blob.pos, methodAnnotationSetsOffsets.len)
+        }
+        //FIXME: var methodAnnotationsOffsets: Slots32[tuple[m: MethodTuple, i: int]]
+        for c in &self.classes {
+            let Some(ref cd) = c.class_data else {
+                continue;
+            };
+            for (i, m) in cd
+                .direct_methods
+                .iter()
+                .chain(cd.virtual_methods.iter())
+                .enumerate()
+            {
+                if m.annotations.len() == 0 {
+                    continue;
+                }
+                method_annotation_sets_offsets.set_all_here(&m.m, &mut blob);
+                blob.write_u32::<LE>(m.annotations.len().to_u32().unwrap());
+                //FIXME: method_annotation_offsets.insert((&m.m, i), blob.slot32());
+            }
+            //FIXME: if methodAnnotationsOffsets.len > 0:
+            //FIXME:   # TODO: [LATER] other kinds of annotations
+            //FIXME:   sections.add (0x2004'u16, blob.pos, methodAnnotationsOffsets.len)
+            for c in &self.classes {
+                let Some(ref cd) = c.class_data else {
+                    continue;
+                };
+                for (i, m) in cd
+                    .direct_methods
+                    .iter()
+                    .chain(cd.virtual_methods.iter())
+                    .enumerate()
+                {
+                    //FIXME: method_annotation_offsets.set_all_here((m.m, i), &mut blob);
+                    for a in &m.annotations {
+                        blob.push(a.visibility as u8);
+                        let ea = &a.encoded_annotation;
+                        blob.put_uleb128(self.types.rank(&ea.typ).to_u32().unwrap());
+                        blob.put_uleb128(ea.elems.len().to_u32().unwrap());
+                        for el in &ea.elems {
+                            blob.put_uleb128(string_ids[self.strings[&el.name]]);
+                            self.render_encoded_value(&mut blob, &el.value);
+                        }
+                    }
+                }
+            }
         }
 
         blob
@@ -433,6 +482,42 @@ impl Dex {
                 blob.put_uleb128(code_offsets[&m.m]);
             }
         }
+    }
+
+    fn render_encoded_value(&self, blob: &mut Vec<u8>, v: &EncodedValue) {
+        use crate::EncodedValue::*;
+        match v {
+            Type(typ) => {
+                let s = ev_uint(self.types.rank(typ).to_u32().unwrap());
+                blob.push(ev_hdr(0x18, s.len().to_u8().unwrap() - 1));
+                blob.write(&s);
+            }
+            Array(elems) => {
+                blob.push(ev_hdr(0x1c, 0));
+                blob.put_uleb128(elems.len().to_u32().unwrap());
+                for el in elems {
+                    self.render_encoded_value(blob, &el);
+                }
+            }
+        }
+    }
+}
+
+/// evHdr formats typ & arg as an EncodedValue's internal "header byte"
+fn ev_hdr(typ: u8, arg: u8) -> u8 {
+    (arg << 5) | typ
+}
+
+/// evUint returns v marshalled in format useful for
+/// EncodedValue. It is marshalled as low-endian, with
+/// any trailing '\0' bytes stripped.
+fn ev_uint(v: u32) -> Vec<u8> {
+    let bytes = v.to_le_bytes();
+    match v {
+        0..=0xff => bytes[..1].iter().map(|v| *v).collect(),
+        0x100..=0xffff => bytes[..2].iter().map(|v| *v).collect(),
+        0x1_0000..=0xff_ffff => bytes[..3].iter().map(|v| *v).collect(),
+        0x100_0000..=0xffff_ffff => bytes.iter().map(|v| *v).collect(),
     }
 }
 
