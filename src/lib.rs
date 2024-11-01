@@ -199,7 +199,7 @@ impl Dex {
             if c.interfaces.len() > 0 {
                 type_list_offs.insert(c.interfaces.clone(), blob.slot32());
             } else {
-                blob.put_u32(0u32);
+                blob.put_u32(0);
             }
             blob.put_u32(NO_INDEX); // TODO: source_file_idx
             let has_annotations = if let Some(ref cd) = c.class_data {
@@ -238,8 +238,8 @@ impl Dex {
                 blob.put_u16(code.registers);
                 blob.put_u16(code.ins);
                 blob.put_u16(code.outs);
-                blob.put_u16(0u16); // TODO: tries_size
-                blob.put_u32(0u32); // TODO: debug_info_off
+                blob.put_u16(0); // TODO: tries_size
+                blob.put_u32(0); // TODO: debug_info_off
                 let slot_off = blob.pos();
                 let slot = blob.slot32(); // Shall be filled with size of instrs, in 16-bit code units
                 self.render_instrs(&mut blob, &code.instrs, &string_ids);
@@ -274,7 +274,7 @@ impl Dex {
             // FIXME: length *in UTF-16 code units*, as ULEB128
             blob.put_uszleb128(s.len());
             blob.write(s.as_bytes());
-            blob.put_u8(0u8); // string-terminator NULL byte
+            blob.put_u8(0); // string-terminator NULL byte
         }
 
         //-- Render class data
@@ -287,7 +287,7 @@ impl Dex {
             } else {
                 &empty
             };
-            blob.put_uleb128(0u32); // TODO: static_fields_size
+            blob.put_uleb128(0); // TODO: static_fields_size
             blob.put_uszleb128(d.instance_fields.len());
             blob.put_uszleb128(d.direct_methods.len());
             blob.put_uszleb128(d.virtual_methods.len());
@@ -311,11 +311,11 @@ impl Dex {
             let Some(ref cd) = c.class_data else {
                 continue;
             };
-            blob.put_u32(0u32); // TODO: class_annotations_off
-            blob.put_u32(0u32); // TODO: fields_size
+            blob.put_u32(0); // TODO: class_annotations_off
+            blob.put_u32(0); // TODO: fields_size
             let n_methods_slot = blob.slot32();
             let mut n_methods = 0u32;
-            blob.put_u32(0u32); // TODO: annotated_parameters_size
+            blob.put_u32(0); // TODO: annotated_parameters_size
             for m in cd.direct_methods.iter().chain(cd.virtual_methods.iter()) {
                 if m.annotations.len() == 0 {
                     continue;
@@ -475,7 +475,7 @@ impl Dex {
 
     fn strings_ordering(&self) -> Vec<u32> {
         let mut ordering = Vec::new();
-        ordering.resize(self.strings.len(), 0u32);
+        ordering.resize(self.strings.len(), 0);
         for (i, added) in self.strings.values().enumerate() {
             ordering[*added] = i.to_u32().unwrap();
         }
@@ -550,7 +550,7 @@ impl Dex {
             blob.put_uleb128(m.access.bits());
             use crate::Access::*;
             if m.access.intersects(Native | Abstract) {
-                blob.put_uleb128(0u32);
+                blob.put_uleb128(0);
             } else {
                 blob.put_uleb128(code_offsets[&m.m]);
             }
