@@ -73,7 +73,6 @@ impl Dex {
                     }
                 }
             }
-            // ...
         }
 
         self.classes.push(c);
@@ -401,7 +400,6 @@ impl Dex {
         blob.set(data_size, blob.pos() - data_start); // FIXME: round to 64?
         blob.set(file_size, blob.pos());
         //-- Fill checksums
-        //FIXME
         let mut sha1 = sha1_smol::Sha1::new();
         sha1.update(&blob[0x20..]);
         blob.splice(sha1_sum_pos..sha1_sum_pos + 20, sha1.digest().bytes());
