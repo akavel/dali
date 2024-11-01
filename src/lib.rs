@@ -152,11 +152,12 @@ impl Dex {
         // segments inbetween.
         sections.push(section(0x0003, blob.pos(), self.prototypes.len()));
         blob.set(proto_ids_off, blob.pos());
+        let mut type_list_offs = Slots32::<Vec<Type>>::new();
         for p in &self.prototypes {
             let desc = &p.descriptor();
             blob.write_u32::<LE>(string_ids[self.strings[desc]]);
             blob.write_u32::<LE>(self.types.rank(&p.ret).to_u32().unwrap());
-            blob.write(&[0u8; 4]); // FIXME: type_list_offs[i] slot32
+            type_list_offs.insert(p.params.clone(), blob.slot32());
         }
 
         //-- Render field IDs
@@ -195,7 +196,7 @@ impl Dex {
                 blob.write_u32::<LE>(NO_INDEX);
             }
             if c.interfaces.len() > 0 {
-                blob.write(&[0u8; 4]); // FIXME: type_list_offsets[...]
+                type_list_offs.insert(c.interfaces.clone(), blob.slot32());
             } else {
                 blob.write_u32::<LE>(0u32);
             }
@@ -254,7 +255,7 @@ impl Dex {
         }
         for l in &self.type_lists {
             blob.pad32();
-            //FIXME: typeListOffsets.setAll(l, blob.pos, blob)
+            type_list_offs.set_all_here(l, &mut blob);
             blob.write_u32::<LE>(l.len().to_u32().unwrap());
             for t in l {
                 blob.write_u16::<LE>(self.types.rank(t).to_u16().unwrap());
