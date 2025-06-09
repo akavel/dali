@@ -9,6 +9,7 @@ mod util;
 use util::{Slot32, Slots32, VecU8Ext};
 mod types;
 pub use types::*;
+mod dclass;
 
 #[derive(Default)]
 pub struct Dex {
