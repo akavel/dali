@@ -26,20 +26,20 @@ macro_rules! dclass {
         }
     };
     // helpers for EncodedMethod building
-    ( [emethod [Public $($modn:tt)*] $([$($rest:tt)*])*] ) => {
-        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_access(Access::Public)
+    ( [emethod [Public $($fnmod:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($fnmod)*] $([$($rest)*])*] ).with_access(Access::Public)
     };
-    ( [emethod [Constructor $($modn:tt)*] $([$($rest:tt)*])*] ) => {
-        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_access(Access::Constructor)
+    ( [emethod [Constructor $($fnmod:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($fnmod)*] $([$($rest)*])*] ).with_access(Access::Constructor)
     };
-    ( [emethod [Regs($n:literal) $($modn:tt)*] $([$($rest:tt)*])*] ) => {
-        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_registers($n as u16)
+    ( [emethod [Regs($n:literal) $($fnmod:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($fnmod)*] $([$($rest)*])*] ).with_registers($n as u16)
     };
-    ( [emethod [Ins($n:literal) $($modn:tt)*] $([$($rest:tt)*])*] ) => {
-        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_ins($n as u16)
+    ( [emethod [Ins($n:literal) $($fnmod:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($fnmod)*] $([$($rest)*])*] ).with_ins($n as u16)
     };
-    ( [emethod [Outs($n:literal) $($modn:tt)*] $([$($rest:tt)*])*] ) => {
-        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_outs($n as u16)
+    ( [emethod [Outs($n:literal) $($fnmod:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($fnmod)*] $([$($rest)*])*] ).with_outs($n as u16)
     };
     (
         [emethod
