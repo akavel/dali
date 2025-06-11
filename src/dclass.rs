@@ -2,7 +2,7 @@
 macro_rules! dclass {
     (
         $($name:ident).+ impl $superclass:ident {
-            #[$($fnmod:ident),+]
+            #[$( $fnmod:ident $(($modarg:literal))? ),+]
             fn <$fn:ident>()
         }
     ) => {
@@ -11,7 +11,7 @@ macro_rules! dclass {
             superclass: Some($superclass.clone()),
             class_data: Some(ClassData {
                 direct_methods: vec![
-                    dclass!( [emethod [$($name).+] [<$fn>] [$($fnmod)+]] ),
+                    dclass!( [emethod [$($name).+] [<$fn>] [$($fnmod $(($modarg))?)+]] ),
                 ],
                 ..Default::default()
             }),
@@ -19,11 +19,20 @@ macro_rules! dclass {
         }
     };
     // helpers for EncodedMethod building
-    ( [emethod [$($c:tt)*] [$($f:tt)*] [Public $($modn:ident)*]] ) => {
+    ( [emethod [$($c:tt)*] [$($f:tt)*] [Public $($modn:tt)*]] ) => {
         dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*]] ).with_access(Access::Public)
     };
-    ( [emethod [$($c:tt)*] [$($f:tt)*] [Constructor $($modn:ident)*]] ) => {
+    ( [emethod [$($c:tt)*] [$($f:tt)*] [Constructor $($modn:tt)*]] ) => {
         dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*]] ).with_access(Access::Constructor)
+    };
+    ( [emethod [$($c:tt)*] [$($f:tt)*] [Regs($n:literal) $($modn:tt)*]] ) => {
+        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*]] ).with_registers($n as u16)
+    };
+    ( [emethod [$($c:tt)*] [$($f:tt)*] [Ins($n:literal) $($modn:tt)*]] ) => {
+        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*]] ).with_ins($n as u16)
+    };
+    ( [emethod [$($c:tt)*] [$($f:tt)*] [Outs($n:literal) $($modn:tt)*]] ) => {
+        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*]] ).with_outs($n as u16)
     };
     (
         [emethod [$($class:ident).+] [<$fn:ident>] [] ]
@@ -58,7 +67,7 @@ mod tests {
         let application = "Landroid/app/Application;".to_string();
         let c = dclass! {
             com.bugsnag.dexexample.BugsnagApp impl application {
-                #[Public, Constructor]
+                #[Public, Constructor, Regs(1), Ins(1), Outs(1)]
                 fn <init>()
             }
         };

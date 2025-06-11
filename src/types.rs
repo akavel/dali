@@ -132,7 +132,7 @@ pub struct Instr {
     pub args: Vec<Arg>,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct Code {
     pub registers: u16,
     pub ins: u16,
@@ -165,9 +165,37 @@ impl EncodedMethod {
     pub fn with_access(self, a: Access) -> Self {
         Self {
             access: self.access | a,
-            m: self.m,
-            annotations: self.annotations,
-            code: self.code,
+            ..self
+        }
+    }
+
+    pub fn with_registers(self, n: u16) -> Self {
+        Self {
+            code: Some(Code {
+                registers: n,
+                ..self.code.unwrap_or_default()
+            }),
+            ..self
+        }
+    }
+
+    pub fn with_ins(self, n: u16) -> Self {
+        Self {
+            code: Some(Code {
+                ins: n,
+                ..self.code.unwrap_or_default()
+            }),
+            ..self
+        }
+    }
+
+    pub fn with_outs(self, n: u16) -> Self {
+        Self {
+            code: Some(Code {
+                outs: n,
+                ..self.code.unwrap_or_default()
+            }),
+            ..self
         }
     }
 }
