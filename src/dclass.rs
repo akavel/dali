@@ -2,19 +2,32 @@
 macro_rules! dclass {
     (
         $($name:ident).+ impl $superclass:ident {
-            // fn <$fn:ident>()
+            fn <$fn:ident>()
         }
     ) => {
         ClassDef {
             class: dclass!( [class [$($name).+]] ),
             superclass: Some($superclass.clone()),
+            class_data: Some(ClassData {
+                direct_methods: vec![EncodedMethod {
+                    m: Method {
+                        class: dclass!( [class [$($name).+]] ),
+                        name: "<".to_owned() +
+                            stringify!($fn) + ">",
+                        ..Default::default() // FIXME
+                    },
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }),
             ..Default::default()
         }
     };
+    // helper for class name building
     (
         [class [$($class:ident).+]]
     ) => {
-        "L".to_string() +
+        "L".to_owned() +
             &[ $(stringify!($class)),+ ].join("/")
             + ";"
     }
@@ -31,7 +44,7 @@ mod tests {
         let application = "Landroid/app/Application;".to_string();
         let c = dclass! {
             com.bugsnag.dexexample.BugsnagApp impl application {
-                // fn <init>()
+                fn <init>()
             }
         };
         assert_eq!(c, ClassDef {

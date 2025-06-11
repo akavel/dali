@@ -50,7 +50,7 @@ pub struct EncodedField {
     pub access: BitFlags<Access>,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct EncodedMethod {
     pub m: Method,
     pub access: BitFlags<Access>,
@@ -89,14 +89,14 @@ pub struct Field {
     pub typ: Type,
 }
 
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default)]
 pub struct Method {
     pub class: Type,
     pub name: String,
     pub prototype: Prototype, // a.k.a. method signature
 }
 
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default)]
 pub struct Prototype {
     pub ret: Type,
     pub params: TypeList,
