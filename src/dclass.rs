@@ -2,19 +2,23 @@ use crate::*;
 
 // TODO: #[macro_export]
 macro_rules! dclass {
-    // ( $($pub:vis)? $($name:ident).+ ) => {
-    ( $($name:ident).+ impl $superclass:ident ) => {
-        (
-            ClassDef {
-                class:
-                    // $()?
-                    "L".to_string() +
-                        &[ $(stringify!($name)),+ ].join("/")
-                        + ";",
-                superclass: Some($superclass.clone()),
-                ..Default::default()
-            }
-        )
+    (
+        $($name:ident).+ impl $superclass:ident {
+            // fn <$fn:ident>()
+        }
+    ) => {
+        ClassDef {
+            class: dclass!( [class [$($name).+]] ),
+            superclass: Some($superclass.clone()),
+            ..Default::default()
+        }
+    };
+    (
+        [class [$($class:ident).+]]
+    ) => {
+        "L".to_string() +
+            &[ $(stringify!($class)),+ ].join("/")
+            + ";"
     }
 }
 
@@ -28,10 +32,10 @@ mod tests {
     fn bugsnag_apk() {
         let application = "Landroid/app/Application;".to_string();
         let c = dclass! {
-            com.bugsnag.dexexample.BugsnagApp impl application
+            com.bugsnag.dexexample.BugsnagApp impl application {
+                // fn <init>()
+            }
         };
-        // assert_eq!(c,
-        //     ("Lcom/bugsnag/dexexample/BugsnagApp;".to_string(), application));
         assert_eq!(c, ClassDef {
             class: "Lcom/bugsnag/dexexample/BugsnagApp;".to_owned(),
             access: Access::Public.into(),
