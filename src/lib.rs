@@ -4,7 +4,7 @@ use std::io::Write;
 use indexset::BTreeSet;
 use num::ToPrimitive;
 
-mod instrs;
+pub mod instrs;
 mod util;
 use util::{Slot32, Slots32, VecU8Ext};
 mod types;
@@ -101,10 +101,10 @@ impl Dex {
         // Most of it can only be calculated after the rest of the segments.
         sections.push(section(0x0000, blob.pos(), 1));
         // TODO: handle various versions of targetSdkVersion file, not only 035
-        write!(blob, "dex\n035\x00");
+        let _ = write!(blob, "dex\n035\x00");
         let adler_sum = blob.slot32();
         let sha1_sum_pos = blob.len();
-        blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
+        let _ = blob.write(&[0u8; 20]); // FIXME: sha1_sum slotN
         let file_size = blob.slot32();
         blob.put_u32(0x70); // Header size
         blob.put_u32(0x12345678); // Endian constant
@@ -273,7 +273,7 @@ impl Dex {
             // FIXME: MUTF-8: use CESU-8 to encode code-points from beneath Basic Multilingual Plane (> U+FFFF)
             // FIXME: length *in UTF-16 code units*, as ULEB128
             blob.put_uszleb128(s.len());
-            blob.write(s.as_bytes());
+            let _ = blob.write(s.as_bytes());
             blob.put_u8(0); // string-terminator NULL byte
         }
 
@@ -364,7 +364,7 @@ impl Dex {
                 let Some(ref cd) = c.class_data else {
                     continue;
                 };
-                for (i, m) in cd
+                for (_i, m) in cd
                     .direct_methods
                     .iter()
                     .chain(cd.virtual_methods.iter())
@@ -562,7 +562,7 @@ impl Dex {
             Type(typ) => {
                 let s = ev_uint(self.types.rank(typ).to_u32().unwrap());
                 blob.push(ev_hdr(0x18, s.len().to_u8().unwrap() - 1));
-                blob.write(&s);
+                let _ = blob.write(&s);
             }
             Array(elems) => {
                 blob.push(ev_hdr(0x1c, 0));
@@ -821,7 +821,7 @@ EC 00 00 00 01 20 00 00  01 00 00 00 0C 01 00 00
 D1 01 00 00 00 10 00 00  01 00 00 00 DC 01 00 00
     ";
 
-    const BUGSNAG_SAMPLE_APK_HEXDUMP: &str = "
+    const _BUGSNAG_SAMPLE_APK_HEXDUMP: &str = "
 6465780A 30333800 7A44CBBB FB4AE841 0286C06A 8DF19000
 3C5DE024 D07326A2 E0010000 70000000 78563412 00000000
 00000000 64010000 05000000 70000000 03000000 84000000

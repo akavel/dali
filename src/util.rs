@@ -29,7 +29,7 @@ impl VecU8Ext for Vec<u8> {
 
     fn pad32(&mut self) {
         let n = (4 - (self.len() % 4)) % 4;
-        self.write(&vec![0u8; n]);
+        let _ = self.write(&vec![0u8; n]);
     }
 
     fn put_u4(&mut self, v: U4, high: &mut bool) {
@@ -47,7 +47,7 @@ impl VecU8Ext for Vec<u8> {
     }
 
     fn put_u16(&mut self, v: u16) {
-        self.write(&v.to_le_bytes());
+        let _ = self.write(&v.to_le_bytes());
     }
 
     fn put_u3216(&mut self, v: u32) {
@@ -59,7 +59,7 @@ impl VecU8Ext for Vec<u8> {
     }
 
     fn put_u32(&mut self, v: u32) {
-        self.write(&v.to_le_bytes());
+        let _ = self.write(&v.to_le_bytes());
     }
 
     fn put_usz32(&mut self, v: usize) {
@@ -74,7 +74,7 @@ impl VecU8Ext for Vec<u8> {
     /// (https://source.android.com/devices/tech/dalvik/dex-format#leb128)
     fn put_uleb128(&mut self, v: u32) {
         if v == 0 {
-            self.write(&[0u8]);
+            let _ = self.write(&[0u8]);
             return;
         }
         let top_bit = v.ilog2(); // position of the highest bit set
@@ -88,14 +88,14 @@ impl VecU8Ext for Vec<u8> {
             i += 1;
         }
         buf[i] = work as u8;
-        self.write(&buf);
+        let _ = self.write(&buf);
     }
 
     fn slot32(&mut self) -> Slot32 {
         let slot = Slot32 {
             offset: Some(self.len()),
         };
-        self.write(&[0u8; 4]);
+        let _ = self.write(&[0u8; 4]);
         slot
     }
 
@@ -181,7 +181,7 @@ mod tests {
     fn test_pad32() {
         fn pad(s: &str) -> Blob {
             let mut b = Blob::new();
-            b.write(s.as_bytes());
+            let _ = b.write(s.as_bytes());
             b.pad32();
             b
         }
