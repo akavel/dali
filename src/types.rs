@@ -199,3 +199,19 @@ impl EncodedMethod {
         }
     }
 }
+
+impl ClassDef {
+    pub fn with_method(self, m: EncodedMethod) -> Self {
+        let direct_access = Access::Constructor | Access::Static | Access::Private;
+        let mut cd = self.class_data.unwrap_or_default();
+        if m.access.intersects(direct_access) {
+            cd.direct_methods.push(m);
+        } else {
+            cd.virtual_methods.push(m);
+        }
+        Self {
+            class_data: Some(cd),
+            ..self
+        }
+    }
+}

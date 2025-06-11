@@ -2,29 +2,79 @@
 macro_rules! dclass {
     (
         $($name:ident).+ impl $superclass:ident {
-            #[$( $fnmod:ident $(($modarg:literal))? ),+]
-            fn <$fn:ident>( $($args:tt)* ) $(-> $ret:ident)? {
-                $( $instr:ident( $($iargs:tt)* ) )+
-            }
+            $($classbody:tt)*
         }
+    ) => {
+        dclass!( [classdef
+            [$($classbody)*]
+            [$($name).+]
+            [$superclass]
+        ])
+    };
+    // helpers for ClassDef building
+    (
+        [classdef
+            [
+                #[$( $fnmod:ident $(($modarg:literal))? ),+]
+                fn <$fn:ident>( $($args:tt)* ) $(-> $ret:ident)? {
+                    $( $instr:ident( $($iargs:tt)* ) )+
+                }
+                $($classbody:tt)*
+            ]
+            [$($name:ident).+]
+            [$superclass:ident]
+        ]
+    ) => {
+        dclass!( [classdef
+            [$($classbody)*]
+            [$($name).+]
+            [$superclass]
+        ]).with_method( dclass!( [emethod
+            [$( $fnmod $(($modarg))? )+]
+            [$($name).+]
+            ["<".to_owned() + stringify!($fn) + ">"]
+            [$($args)*]
+            [$($ret)?]
+            [$( $instr( $($iargs)* ) )+]
+        ]))
+    };
+    (
+        [classdef
+            [
+                #[$( $fnmod:ident $(($modarg:literal))? ),+]
+                fn $fn:ident ( $($args:tt)* ) $(-> $ret:ident)? {
+                    $( $instr:ident( $($iargs:tt)* ) )+
+                }
+                $($classbody:tt)*
+            ]
+            [$($name:ident).+]
+            [$superclass:ident]
+        ]
+    ) => {
+        dclass!( [classdef
+            [$($classbody)*]
+            [$($name).+]
+            [$superclass]
+        ]).with_method( dclass!( [emethod
+            [$( $fnmod $(($modarg))? )+]
+            [$($name).+]
+            [stringify!($fn).to_owned()]
+            [$($args)*]
+            [$($ret)?]
+            [$( $instr( $($iargs)* ) )+]
+        ]))
+    };
+    (
+        [classdef
+            [ ]
+            [$($name:ident).+]
+            [$superclass:ident]
+        ]
     ) => {
         ClassDef {
             class: dclass!( [class [$($name).+]] ),
             access: Access::Public.into(),
             superclass: Some($superclass.clone()),
-            class_data: Some(ClassData {
-                direct_methods: vec![
-                    dclass!( [emethod
-                        [$( $fnmod $(($modarg))? )+]
-                        [$($name).+]
-                        [<$fn>]
-                        [$($args)*]
-                        [$($ret)?]
-                        [$( $instr( $($iargs)* ) )+]
-                    ] ),
-                ],
-                ..Default::default()
-            }),
             ..Default::default()
         }
     };
@@ -48,7 +98,7 @@ macro_rules! dclass {
         [emethod
             []
             [$($class:ident).+]
-            [<$fn:ident>]
+            [$fn:expr]
             [$($args:tt)*]
             [$($ret:ident)?]
             [$( $instr:ident( $($iargs:tt)* ) )+]]
@@ -56,9 +106,9 @@ macro_rules! dclass {
         EncodedMethod {
             m: Method {
                 class: dclass!( [class [$($class).+]] ),
-                name: "<".to_owned() + stringify!($fn) + ">",
+                name: $fn,
                 prototype: Prototype {
-                    params: vec![$($args)*],
+                    params: vec![$($args.clone())*],
                     ret: dclass!( [ret [$($ret)?]] ),
                 },
             },
@@ -99,16 +149,26 @@ macro_rules! dclass {
 
 // TODO: #[macro_export]
 macro_rules! jproto {
-    ( $class:ident . <$fn:ident> () ) => {
+    ( $class:ident . <$fn:ident> ( $($arg:ident),* ) ) => {
         Method {
             class: $class.clone(),
             name: "<".to_owned() + stringify!($fn) + ">",
             prototype: Prototype {
                 ret: "V".to_owned(),
-                params: vec![],
+                params: vec![ $($arg.clone()),* ],
             },
         }
-    }
+    };
+    ( $class:ident . $fn:ident ( $($arg:ident),* ) ) => {
+        Method {
+            class: $class.clone(),
+            name: stringify!($fn).to_owned(),
+            prototype: Prototype {
+                ret: "V".to_owned(),
+                params: vec![ $($arg.clone()),* ],
+            },
+        }
+    };
 }
 
 #[cfg(test)]
@@ -162,6 +222,107 @@ mod tests {
                                     },
                                 },
                             ),
+                            return_void(),
+                        ],
+                    }),
+                }],
+                ..Default::default()
+            }),
+        });
+    }
+
+    #[test]
+    fn hello_android_apk() {
+        let activity = "Landroid/app/Activity;".to_owned();
+        let bundle = "Landroid/os/Bundle;".to_owned();
+        let hello_android = "Lcom/android/hello/HelloAndroid;".to_owned();
+        let int = "I".to_owned();
+        let c = dclass! {
+            com.android.hello.HelloAndroid impl activity {
+                #[Public, Constructor, Regs(1), Ins(1), Outs(1)]
+                fn <init>() {
+                    invoke_direct1(u4!(0), @activity.<init>())
+                    return_void()
+                }
+                #[Public, Regs(3), Ins(2), Outs(2)]
+                fn onCreate(bundle) {
+                    invoke_super2(u4!(1), u4!(2), @activity.onCreate(bundle))
+                    const_high16(0, 0x7f03)
+                    invoke_virtual2(u4!(1), u4!(0), @hello_android.setContentView(int))
+                    return_void()
+                }
+            }
+        };
+        assert_eq!(c, ClassDef {
+            class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+            access: Access::Public.into(),
+            superclass: Some("Landroid/app/Activity;".to_owned()),
+            interfaces: TypeList::default(),
+            class_data: Some(ClassData {
+                direct_methods: vec![EncodedMethod {
+                    m: Method {
+                        class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+                        name: "<init>".to_owned(),
+                        prototype: Prototype {
+                            ret: "V".to_owned(),
+                            params: vec![],
+                        },
+                    },
+                    access: Access::Public | Access::Constructor,
+                    annotations: vec![],
+                    code: Some(Code {
+                        registers: 1,
+                        ins: 1,
+                        outs: 1,
+                        instrs: vec![
+                            invoke_direct1(
+                                u4!(0),
+                                Method {
+                                    class: "Landroid/app/Activity;".to_owned(),
+                                    name: "<init>".to_owned(),
+                                    prototype: Prototype {
+                                        ret: "V".to_owned(),
+                                        params: vec![],
+                                    },
+                                },
+                            ),
+                            return_void(),
+                        ],
+                    }),
+                }],
+                virtual_methods: vec![EncodedMethod {
+                    m: Method {
+                        class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+                        name: "onCreate".to_owned(),
+                        prototype: Prototype {
+                            ret: "V".to_owned(),
+                            params: vec!["Landroid/os/Bundle;".to_owned()],
+                        },
+                    },
+                    access: Access::Public.into(),
+                    annotations: vec![],
+                    code: Some(Code {
+                        registers: 3,
+                        ins: 2,
+                        outs: 2,
+                        instrs: vec![
+                            invoke_super2(u4!(1), u4!(2), Method {
+                                class: "Landroid/app/Activity;".to_owned(),
+                                name: "onCreate".to_owned(),
+                                prototype: Prototype {
+                                    ret: "V".to_owned(),
+                                    params: vec!["Landroid/os/Bundle;".to_owned()],
+                                },
+                            }),
+                            const_high16(0, 0x7f03),
+                            invoke_virtual2(u4!(1), u4!(0), Method {
+                                class: "Lcom/android/hello/HelloAndroid;".to_owned(),
+                                name: "setContentView".to_owned(),
+                                prototype: Prototype {
+                                    ret: "V".to_owned(),
+                                    params: vec!["I".to_owned()],
+                                },
+                            }),
                             return_void(),
                         ],
                     }),
