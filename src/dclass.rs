@@ -3,13 +3,14 @@ macro_rules! dclass {
     (
         $($name:ident).+ impl $superclass:ident {
             #[$( $fnmod:ident $(($modarg:literal))? ),+]
-            fn <$fn:ident>() {
+            fn <$fn:ident>( $($args:tt)* ) $(-> $ret:ident)? {
                 $( $instr:ident( $($iargs:tt)* ) )+
             }
         }
     ) => {
         ClassDef {
             class: dclass!( [class [$($name).+]] ),
+            access: Access::Public.into(),
             superclass: Some($superclass.clone()),
             class_data: Some(ClassData {
                 direct_methods: vec![
@@ -17,6 +18,8 @@ macro_rules! dclass {
                         [$( $fnmod $(($modarg))? )+]
                         [$($name).+]
                         [<$fn>]
+                        [$($args)*]
+                        [$($ret)?]
                         [$( $instr( $($iargs)* ) )+]
                     ] ),
                 ],
@@ -46,13 +49,18 @@ macro_rules! dclass {
             []
             [$($class:ident).+]
             [<$fn:ident>]
+            [$($args:tt)*]
+            [$($ret:ident)?]
             [$( $instr:ident( $($iargs:tt)* ) )+]]
     ) => {
         EncodedMethod {
             m: Method {
                 class: dclass!( [class [$($class).+]] ),
                 name: "<".to_owned() + stringify!($fn) + ">",
-                ..Default::default() // FIXME
+                prototype: Prototype {
+                    params: vec![$($args)*],
+                    ret: dclass!( [ret [$($ret)?]] ),
+                },
             },
             code: Some(Code {
                 instrs: vec![
@@ -74,6 +82,10 @@ macro_rules! dclass {
     };
     ( [iargs $i:ident [,] $([$($out:tt)*])*] ) => {
         $i ( $($($out)*),* )
+    };
+    // helper for return type name building
+    ( [ret []] ) => {
+        "V".to_owned()
     };
     // helper for class name building
     (
