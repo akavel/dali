@@ -14,9 +14,9 @@ macro_rules! dclass {
             class_data: Some(ClassData {
                 direct_methods: vec![
                     dclass!( [emethod
+                        [$( $fnmod $(($modarg))? )+]
                         [$($name).+]
                         [<$fn>]
-                        [$( $fnmod $(($modarg))? )+]
                         [$( $instr( $($iargs)* ) )+]
                     ] ),
                 ],
@@ -26,26 +26,26 @@ macro_rules! dclass {
         }
     };
     // helpers for EncodedMethod building
-    ( [emethod [$($c:tt)*] [$($f:tt)*] [Public $($modn:tt)*] [$($i:tt)*]] ) => {
-        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*] [$($i)*]] ).with_access(Access::Public)
+    ( [emethod [Public $($modn:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_access(Access::Public)
     };
-    ( [emethod [$($c:tt)*] [$($f:tt)*] [Constructor $($modn:tt)*] [$($i:tt)*]] ) => {
-        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*] [$($i)*]] ).with_access(Access::Constructor)
+    ( [emethod [Constructor $($modn:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_access(Access::Constructor)
     };
-    ( [emethod [$($c:tt)*] [$($f:tt)*] [Regs($n:literal) $($modn:tt)*] [$($i:tt)*]] ) => {
-        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*] [$($i)*]] ).with_registers($n as u16)
+    ( [emethod [Regs($n:literal) $($modn:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_registers($n as u16)
     };
-    ( [emethod [$($c:tt)*] [$($f:tt)*] [Ins($n:literal) $($modn:tt)*] [$($i:tt)*]] ) => {
-        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*] [$($i)*]] ).with_ins($n as u16)
+    ( [emethod [Ins($n:literal) $($modn:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_ins($n as u16)
     };
-    ( [emethod [$($c:tt)*] [$($f:tt)*] [Outs($n:literal) $($modn:tt)*] [$($i:tt)*]] ) => {
-        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*] [$($i)*]] ).with_outs($n as u16)
+    ( [emethod [Outs($n:literal) $($modn:tt)*] $([$($rest:tt)*])*] ) => {
+        dclass!( [emethod [$($modn)*] $([$($rest)*])*] ).with_outs($n as u16)
     };
     (
         [emethod
+            []
             [$($class:ident).+]
             [<$fn:ident>]
-            []
             [$( $instr:ident( $($iargs:tt)* ) )+]]
     ) => {
         EncodedMethod {
