@@ -56,12 +56,24 @@ macro_rules! dclass {
             },
             code: Some(Code {
                 instrs: vec![
-                    $( $instr( $($iargs)* ) ),+
+                    $(
+                        dclass!( [iargs $instr [, $($iargs)*]] )
+                    ),+
                 ],
                 ..Default::default()
             }),
             ..Default::default()
         }
+    };
+    // helper for Instr args building
+    ( [iargs $i:ident [, $v:expr $(, $($in:tt)* )? ] $([$($out:tt)*])*] ) => {
+        dclass!( [iargs $i [, $( $($in)* )?] $([$($out)*])* [$v]] )
+    };
+    ( [iargs $i:ident [, @ $($proto:tt)*] $([$($out:tt)*])*] ) => {
+        dclass!( [iargs $i [,] $([$($out)*])* [jproto!( $($proto)* )]] )
+    };
+    ( [iargs $i:ident [,] $([$($out:tt)*])*] ) => {
+        $i ( $($($out)*),* )
     };
     // helper for class name building
     (
@@ -70,6 +82,20 @@ macro_rules! dclass {
         "L".to_owned() +
             &[ $(stringify!($class)),+ ].join("/")
             + ";"
+    }
+}
+
+// TODO: #[macro_export]
+macro_rules! jproto {
+    ( $class:ident . <$fn:ident> () ) => {
+        Method {
+            class: $class.clone(),
+            name: "<".to_owned() + stringify!($fn) + ">",
+            prototype: Prototype {
+                ret: "V".to_owned(),
+                params: vec![],
+            },
+        }
     }
 }
 
@@ -86,7 +112,7 @@ mod tests {
             com.bugsnag.dexexample.BugsnagApp impl application {
                 #[Public, Constructor, Regs(1), Ins(1), Outs(1)]
                 fn <init>() {
-                    //invoke_direct(0, @application.<init>())
+                    invoke_direct1(u4!(0), @application.<init>())
                     return_void()
                 }
             }
