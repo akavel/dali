@@ -160,3 +160,14 @@ pub enum EncodedValue {
     Type(Type),
     Array(Vec<EncodedValue>),
 }
+
+impl EncodedMethod {
+    pub fn with_access(self, a: Access) -> Self {
+        Self {
+            access: self.access | a,
+            m: self.m,
+            annotations: self.annotations,
+            code: self.code,
+        }
+    }
+}

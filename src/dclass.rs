@@ -2,6 +2,7 @@
 macro_rules! dclass {
     (
         $($name:ident).+ impl $superclass:ident {
+            #[$($fnmod:ident),+]
             fn <$fn:ident>()
         }
     ) => {
@@ -9,17 +10,30 @@ macro_rules! dclass {
             class: dclass!( [class [$($name).+]] ),
             superclass: Some($superclass.clone()),
             class_data: Some(ClassData {
-                direct_methods: vec![EncodedMethod {
-                    m: Method {
-                        class: dclass!( [class [$($name).+]] ),
-                        name: "<".to_owned() +
-                            stringify!($fn) + ">",
-                        ..Default::default() // FIXME
-                    },
-                    ..Default::default()
-                }],
+                direct_methods: vec![
+                    dclass!( [emethod [$($name).+] [<$fn>] [$($fnmod)+]] ),
+                ],
                 ..Default::default()
             }),
+            ..Default::default()
+        }
+    };
+    // helpers for EncodedMethod building
+    ( [emethod [$($c:tt)*] [$($f:tt)*] [Public $($modn:ident)*]] ) => {
+        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*]] ).with_access(Access::Public)
+    };
+    ( [emethod [$($c:tt)*] [$($f:tt)*] [Constructor $($modn:ident)*]] ) => {
+        dclass!( [emethod [$($c)*] [$($f)*] [$($modn)*]] ).with_access(Access::Constructor)
+    };
+    (
+        [emethod [$($class:ident).+] [<$fn:ident>] [] ]
+    ) => {
+        EncodedMethod {
+            m: Method {
+                class: dclass!( [class [$($class).+]] ),
+                name: "<".to_owned() + stringify!($fn) + ">",
+                ..Default::default() // FIXME
+            },
             ..Default::default()
         }
     };
@@ -44,6 +58,7 @@ mod tests {
         let application = "Landroid/app/Application;".to_string();
         let c = dclass! {
             com.bugsnag.dexexample.BugsnagApp impl application {
+                #[Public, Constructor]
                 fn <init>()
             }
         };
