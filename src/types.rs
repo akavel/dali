@@ -4,7 +4,7 @@ pub use u4::U4;
 pub type Type = String;
 pub type TypeList = Vec<Type>;
 
-#[derive(Debug)]
+#[derive(Default, PartialEq, Debug)]
 pub struct ClassDef {
     pub class: Type,
     pub access: BitFlags<Access>,
@@ -35,7 +35,7 @@ pub enum Access {
     Constructor = 0x1_0000,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, PartialEq, Debug)]
 pub struct ClassData {
     // static_fields: ?
     // TODO: add some tests for rendered instance_fields
@@ -44,13 +44,13 @@ pub struct ClassData {
     pub virtual_methods: Vec<EncodedMethod>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct EncodedField {
     pub f: Field,
     pub access: BitFlags<Access>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct EncodedMethod {
     pub m: Method,
     pub access: BitFlags<Access>,
@@ -58,25 +58,25 @@ pub struct EncodedMethod {
     pub code: Option<Code>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct AnnotationItem {
     pub visibility: Visibility,
     pub encoded_annotation: EncodedAnnotation,
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Visibility {
     System = 0x02,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct EncodedAnnotation {
     pub typ: Type,
     pub elems: Vec<AnnotationElement>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct AnnotationElement {
     pub name: String,
     pub value: EncodedValue,
@@ -119,7 +119,7 @@ impl Prototype {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Instr {
     pub opcode: u8,
     // NOTE: We're assuming little endian encoding of the
@@ -132,7 +132,7 @@ pub struct Instr {
     pub args: Vec<Arg>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Code {
     pub registers: u16,
     pub ins: u16,
@@ -142,7 +142,7 @@ pub struct Code {
     pub instrs: Vec<Instr>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Arg {
     RawX(U4),
     RawXX(u8),
@@ -155,7 +155,7 @@ pub enum Arg {
     MethodXXXX(Method),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum EncodedValue {
     Type(Type),
     Array(Vec<EncodedValue>),

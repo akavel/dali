@@ -1,13 +1,19 @@
+use crate::*;
+
 // TODO: #[macro_export]
 macro_rules! dclass {
     // ( $($pub:vis)? $($name:ident).+ ) => {
     ( $($name:ident).+ impl $superclass:ident ) => {
         (
-            // $()?
-            ("L".to_string() +
-                &[ $(stringify!($name)),+ ].join("/")
-                + ";"
-            , $superclass.clone())
+            ClassDef {
+                class:
+                    // $()?
+                    "L".to_string() +
+                        &[ $(stringify!($name)),+ ].join("/")
+                        + ";",
+                superclass: Some($superclass.clone()),
+                ..Default::default()
+            }
         )
     }
 }
@@ -24,8 +30,8 @@ mod tests {
         let c = dclass! {
             com.bugsnag.dexexample.BugsnagApp impl application
         };
-        assert_eq!(c,
-            ("Lcom/bugsnag/dexexample/BugsnagApp;".to_string(), application));
+        // assert_eq!(c,
+        //     ("Lcom/bugsnag/dexexample/BugsnagApp;".to_string(), application));
         assert_eq!(c, ClassDef {
             class: "Lcom/bugsnag/dexexample/BugsnagApp;".to_owned(),
             access: Access::Public.into(),
