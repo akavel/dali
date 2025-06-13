@@ -5,7 +5,8 @@ use indexset::BTreeSet;
 use num::ToPrimitive;
 
 pub mod instrs;
-mod util;
+pub mod manifest;
+pub mod util;
 use util::{Slot32, Slots32, VecU8Ext};
 mod types;
 pub use types::*;
@@ -607,8 +608,8 @@ fn adler32(s: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use crate::util::parse_hex;
     use super::{instrs::*, *};
-    use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use pretty_hex::*;
     use u4::u4;
@@ -886,23 +887,4 @@ ac00 0000 0500 0000 0500 0000 d000 0000
 0020 0000 0100 0000 e101 0000 0010 0000
 0100 0000 f001 0000
     ";
-
-    fn parse_hex(s: &str) -> Vec<u8> {
-        fn parse_nibble(c: u8) -> u8 {
-            match c {
-                b'0'..=b'9' => c - b'0',
-                b'a'..=b'f' => c - b'a' + 0xa,
-                b'A'..=b'F' => c - b'A' + 0xa,
-                _ => panic!("not a hex digit: '{}'", c as char),
-            }
-        }
-        s.bytes()
-            .filter(|b| !b.is_ascii_whitespace())
-            .tuples::<(_, _)>()
-            .map(|tup| match tup {
-                (b'.', c) => c,
-                (hi, lo) => parse_nibble(hi) << 4 | parse_nibble(lo),
-            })
-            .collect()
-    }
 }

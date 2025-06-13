@@ -3,8 +3,12 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::rc::Rc;
 
+#[cfg(test)]
+use itertools::Itertools;
 use num::ToPrimitive;
 use u4::{u4, U4x2, U4};
+
+pub mod binparse;
 
 pub trait VecU8Ext {
     fn pos(&self) -> u32;
@@ -167,6 +171,26 @@ impl<T: Ord> Slots32<T> {
             .or_insert_with(|| vec![])
             .push(Rc::new(value));
     }
+}
+
+#[cfg(test)]
+pub(crate) fn parse_hex(s: &str) -> Vec<u8> {
+    fn parse_nibble(c: u8) -> u8 {
+        match c {
+            b'0'..=b'9' => c - b'0',
+            b'a'..=b'f' => c - b'a' + 0xa,
+            b'A'..=b'F' => c - b'A' + 0xa,
+            _ => panic!("not a hex digit: '{}'", c as char),
+        }
+    }
+    s.bytes()
+        .filter(|b| !b.is_ascii_whitespace())
+        .tuples::<(_, _)>()
+        .map(|tup| match tup {
+            (b'.', c) => c,
+            (hi, lo) => parse_nibble(hi) << 4 | parse_nibble(lo),
+        })
+        .collect()
 }
 
 #[cfg(test)]
