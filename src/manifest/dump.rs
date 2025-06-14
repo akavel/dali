@@ -2,14 +2,15 @@
 //! AndroidManifest.xml files. The output format is intended
 //! to be similar to what `aapt dump` would print.
 
-use std::io::BufRead;
+use std::io;
 
+use anyhow::bail;
 use bytesutil::ReadExt;
 
 use crate::util::binparse::little_endian::GetExt;
 
 #[repr(u16)]
-pub enum ChunkType {
+enum ChunkType {
     StringPool = 0x0001,
     XML = 0x0003,
     XMLStartNS = 0x0100,
@@ -19,31 +20,180 @@ pub enum ChunkType {
     XMLResourceMap = 0x0180,
 }
 
-pub fn dump(mut r: impl BufRead) -> anyhow::Result<Vec<String>> {
-    // TODO: try using some parser helper tool
+#[repr(u8)]
+enum DataType {
+    String = 0x03,
+    Int = 0x10,
+}
 
-
+pub fn dump(mut r: impl io::Read) -> anyhow::Result<Vec<String>> {
     // File header
     r.expect(ChunkType::XML as u16, "magic header")?;
-    // expect_le(&mut r, ChunkType::XML as u16, "magic header")?;
     let mut out = vec!["Binary XML\n".to_owned()];
     r.expect(8u16, "header size")?;
-    // expect_le(&mut r, 8u16, "header size")?;
     let _ = r.get::<u32>()?; // FIXME: verify chunk size
 
     // Read "strings pool"
     // Chunk header
+    r.expect(ChunkType::StringPool as u16, "string pool header")?;
+    r.expect(0x1Cu16, "string pool header size")?;
+    let _ = r.get::<u32>()?; // FIXME: verify chunk size
+    let n_strings: u32 = r.get()?;
+    r.expect(0u32, "style counter")?;
+    r.expect(0u32, "flags")?;
+    let _ = r.get::<u32>()?; // FIXME: verify strings start
+    r.expect(0u32, "styles start")?;
+    // Strings offsets
+    for _ in 0..n_strings {
+        let _ = r.get::<u32>()?; // FIXME: verify strings offsets
+    }
+    // Read strings
+    let mut pool = vec![];
+    for _ in 0..n_strings {
+        let length: u16 = r.get()?; // FIXME: support long strings
+        let mut buf = String::new(); // vec![];
+        for _ in 0..length {
+            let ch: u16 = r.get()?;
+            // FIXME: support full UTF-16
+            if ch > 127u16 {
+                bail!("non-ASCII (7bit) characters not yet implemented");
+            }
+            buf.push(ch as u8 as char);
+        }
+        r.expect(0u16, "string terminator NULL")?;
+        pool.push(buf);
+    }
+
+    // Read "XML resources map"
+    // Chunk header
+    r.expect(ChunkType::XMLResourceMap as u16, "XML resources map header")?;
+    r.expect(8u16, "XML resources map header size");
+    let map_size: u32 = r.get()?;
+    let n_res_ids = (map_size - 8) / 4;
+    let mut res_ids = vec![];
+    for _ in 0..n_res_ids {
+        res_ids.push(r.get::<u32>()?);
+    }
+
+    // Read "XML nodes"
+    let mut r = peekread::BufPeakReader(r);
+    let mut prev_line_no = 1u32;
+    let mut indent = String::new();
+    let mut stack = vec![];
+    while !is_eof(&mut r) {
+        let chunk_type: u16 = r.get()?;
+        let header_size: u16 = r.get()?; // FIXME: verify
+        let chunk_size: u32 = r.get()?; // FIXME: verify
+        let line_no: u32 = r.get()?;
+        r.expect(0xffff_ffffu32, "comment index")?;
+        if line_no < prev_line_no {
+            bail!("expected increasing line_no, got {line_no} < {prev_line_no}");
+        }
+        use ChunkType::*;
+        match chunk_type {
+            XMLStartNS as u16 => {
+                let ns_prefix: u32 = r.get()?;
+                let ns_uri: u32 = r.get()?;
+                result.add(format!("{indent}N: {}={}",
+                    pool[ns_prefix as usize],
+                    pool[ns_uri as usize],
+                ));
+                indent.push_str("  ");
+                stack.push(format!("N {ns_prefix:#02x} {ns_uri:#02x}"));
+            }
+            XMLEndNS as u16 => {
+                let ns_prefix: u32 = r.get()?;
+                let ns_uri: u32 = r.get()?;
+                let want_stack = format!("N {ns_prefix:#02x} {ns_uri:#02x}");
+                let Some(top) = stack.pop() else {
+                    bail!("found XMLEndNS without matching start: {want_stack}");
+                };
+                if top != want_stack {
+                    bail!("found XMLEndNS for {}, but last XMLStartNS was different: {top}");
+                }
+                let unindent = indent.len() - 2;
+                indent.drain(unindent..);
+            }
+            XMLStartElement as u16 => {
+                let ns: u32 = r.get()?;
+                let name: u32 = r.get()?;
+                r.expect(0x14u16, "attributes start")?;
+                r.expect(0x14u16, "attributes size")?;
+                let n_attr: u16 = r.get()?;
+                r.expect(0u16, "ID index");
+                r.expect(0u16, "class index");
+                r.expect(0u16, "style index");
+                let mut row = indent + "E: ";
+                if ns != 0xffff_ffffu32 {
+                    row.push_str(pool[ns as usize] + ":");
+                }
+                result.push(row + pool[name as usize]);
+                indent.push_str("  ");
+                stack.push(format!("E {ns:#02x} {name:#02x}"));
+                // Attributes
+                for i in 0..n_attr {
+                    let ns: u32 = r.get()?;
+                    let name: u32 = r.get()?;
+                    let raw: u32 = r.get()?;
+                    r.expect(8u16, "attr size");
+                    r.expect(0u8, "res0");
+                    let data_type: u8 = r.get()?;
+                    let data: u32 = r.get()?;
+                    let mut row = indent + "A: ";
+                    if ns != 0xffff_ffffu32 {
+                        row.push_str(pool[ns as usize] + ":");
+                    }
+                    row.push_str(pool[name as usize]);
+                    if name < res_ids.len() {
+                        row.push_str(&format!("(0x{:#02x})", res_ids[name as usize]));
+                    }
+                    row.push_str("=");
+                    match data_type {
+                        DataType::String as u8 => row.push_str(&format!("\"{}\"", pool[data as usize])),
+                        DataType::Int as u8 => row.push_str(&format!("{}", data)),
+                        _ => bail!("unknown attribute type: 0x{data_type:#02x}"),
+                    }
+                    if raw != 0xffff_ffffu32 {
+                        row.push_str(&format!(" (Raw: \"{}\")", pool[raw as usize]));
+                    }
+                    result.push(row);
+                }
+                indent.push_str("  ");
+            }
+            XMLEndElement as u16 => {
+                let ns: u32 = r.get()?;
+                let name: u32 = r.get()?;
+                let want_stack = format!("E {ns:#02x} {name:#02x}");
+                let Some(top) = stack.pop() else {
+                    bail!("found XMLEndElement without matching start: {want_stack}");
+                };
+                if top != want_stack {
+                    bail!("found XMLEndElement for {}, but last XMLStartElement was different: {top}");
+                }
+                let unindent = indent.len() - 4;
+                indent.drain(unindent..);
+            }
+            _ => bail!("unexpected chunk type: 0x{chunk_type:#02x}"),
+        }
+        if stack.len() != 0 {
+            bail!("unexpected non-empty stack: {stack:?}");
+        }
+    }
+
 
     Ok(out)
 }
 
-// fn expect_le<T: bytesutil::ReadFrom>(r: &mut impl BufRead, want: T, name: &str) -> Result<()> {
-//     let got = r.read_le::<T>()?;
-//     if got != want {
-//         bail!("{name} mismatch, want 0x{want:#02x}, got: 0x{got:#02x}");
-//     }
-//     Ok(())
-// }
+fn is_eof(r: &mut impl peekread::PeekRead) -> IoResult<bool> {
+    let mut peeker = r.peek();
+    let Err(e) = peeker.get::<u8>() else {
+        return Ok(false);
+    }
+    if e.kind() == io::ErrorKind::UnexpectedEof {
+        return Ok(true);
+    }
+    Err(e)
+}
 
 #[cfg(test)]
 mod tests {

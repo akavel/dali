@@ -9,6 +9,7 @@ bytesutil = "0.7.0"
 enumflags2 = { version = "0.7.10", features = ["std"] }
 indexset = "0.5.0"
 num = "0.4.3"
+peekread = "0.1.1"
 sha1_smol = "1.0.1"
 thiserror = "2.0.12"
 u4 = "0.1.2"

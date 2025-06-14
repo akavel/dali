@@ -36,6 +36,7 @@ dependencies = [
  "indexset",
  "itertools",
  "num",
+ "peekread",
  "pretty-hex",
  "pretty_assertions",
  "sha1_smol",
@@ -175,6 +176,12 @@ checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "peekread"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "978122cdc72f39ed3c6343907453570570699169aace43dd09d46b52cc5f681d"
 
 [[package]]
 name = "pretty-hex"
