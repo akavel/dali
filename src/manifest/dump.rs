@@ -12,7 +12,7 @@ use crate::util::binparse::little_endian::GetExt;
 
 #[derive(FromPrimitive)]
 #[repr(u16)]
-enum ChunkType {
+pub(crate) enum ChunkType {
     StringPool = 0x0001,
     XML = 0x0003,
     XMLStartNS = 0x0100,
@@ -24,7 +24,7 @@ enum ChunkType {
 
 #[derive(FromPrimitive)]
 #[repr(u8)]
-enum DataType {
+pub(crate) enum DataType {
     String = 0x03,
     Int = 0x10,
 }
