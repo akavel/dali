@@ -1,11 +1,11 @@
 use std::io;
 
-use android_manifest::AndroidManifest;
+use xmltree::Element as XmlElem;
 
 mod dump;
 pub use dump::dump;
 
-pub fn compile(m: &AndroidManifest, w: &mut impl io::Write) -> anyhow::Result<()> {
+pub fn compile(manifest: &XmlElem, w: &mut impl io::Write) -> anyhow::Result<()> {
     Ok(())
 }
 
@@ -17,9 +17,9 @@ mod tests {
 
     #[test]
     fn manifest_based_on_czak_minimal_android_project() {
-        let m = android_manifest::from_str(MANIFEST_XML).unwrap();
+        let manifest = XmlElem::parse(MANIFEST_XML.as_bytes()).unwrap();
         let mut buf = Vec::<u8>::new();
-        compile(&m, &mut buf).unwrap();
+        compile(&manifest, &mut buf).unwrap();
         assert_eq!(
             MANIFEST_DUMP,
             dump(&*buf).unwrap().join("\n"),
