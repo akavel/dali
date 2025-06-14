@@ -5,10 +5,12 @@
 use std::io;
 
 use anyhow::bail;
-use bytesutil::ReadExt;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 
 use crate::util::binparse::little_endian::GetExt;
 
+#[derive(FromPrimitive)]
 #[repr(u16)]
 enum ChunkType {
     StringPool = 0x0001,
@@ -20,6 +22,7 @@ enum ChunkType {
     XMLResourceMap = 0x0180,
 }
 
+#[derive(FromPrimitive)]
 #[repr(u8)]
 enum DataType {
     String = 0x03,
@@ -29,7 +32,7 @@ enum DataType {
 pub fn dump(mut r: impl io::Read) -> anyhow::Result<Vec<String>> {
     // File header
     r.expect(ChunkType::XML as u16, "magic header")?;
-    let mut out = vec!["Binary XML\n".to_owned()];
+    let mut out = vec!["Binary XML".to_owned()];
     r.expect(8u16, "header size")?;
     let _ = r.get::<u32>()?; // FIXME: verify chunk size
 
@@ -67,7 +70,7 @@ pub fn dump(mut r: impl io::Read) -> anyhow::Result<Vec<String>> {
     // Read "XML resources map"
     // Chunk header
     r.expect(ChunkType::XMLResourceMap as u16, "XML resources map header")?;
-    r.expect(8u16, "XML resources map header size");
+    r.expect(8u16, "XML resources map header size")?;
     let map_size: u32 = r.get()?;
     let n_res_ids = (map_size - 8) / 4;
     let mut res_ids = vec![];
@@ -76,119 +79,120 @@ pub fn dump(mut r: impl io::Read) -> anyhow::Result<Vec<String>> {
     }
 
     // Read "XML nodes"
-    let mut r = peekread::BufPeakReader(r);
+    let mut r = peekread::BufPeekReader::new(r);
     let mut prev_line_no = 1u32;
     let mut indent = String::new();
     let mut stack = vec![];
-    while !is_eof(&mut r) {
+    while !is_eof(&mut r)? {
         let chunk_type: u16 = r.get()?;
-        let header_size: u16 = r.get()?; // FIXME: verify
-        let chunk_size: u32 = r.get()?; // FIXME: verify
+        let _header_size: u16 = r.get()?; // FIXME: verify
+        let _chunk_size: u32 = r.get()?; // FIXME: verify
         let line_no: u32 = r.get()?;
         r.expect(0xffff_ffffu32, "comment index")?;
         if line_no < prev_line_no {
             bail!("expected increasing line_no, got {line_no} < {prev_line_no}");
         }
+        prev_line_no = line_no;
         use ChunkType::*;
-        match chunk_type {
-            XMLStartNS as u16 => {
+        match ChunkType::from_u16(chunk_type) {
+            Some(XMLStartNS) => {
                 let ns_prefix: u32 = r.get()?;
                 let ns_uri: u32 = r.get()?;
-                result.add(format!("{indent}N: {}={}",
+                out.push(format!("{indent}N: {}={}",
                     pool[ns_prefix as usize],
                     pool[ns_uri as usize],
                 ));
                 indent.push_str("  ");
-                stack.push(format!("N {ns_prefix:#02x} {ns_uri:#02x}"));
+                stack.push(format!("N {ns_prefix:08x} {ns_uri:08x}"));
             }
-            XMLEndNS as u16 => {
+            Some(XMLEndNS) => {
                 let ns_prefix: u32 = r.get()?;
                 let ns_uri: u32 = r.get()?;
-                let want_stack = format!("N {ns_prefix:#02x} {ns_uri:#02x}");
+                let want_stack = format!("N {ns_prefix:08x} {ns_uri:08x}");
                 let Some(top) = stack.pop() else {
                     bail!("found XMLEndNS without matching start: {want_stack}");
                 };
                 if top != want_stack {
-                    bail!("found XMLEndNS for {}, but last XMLStartNS was different: {top}");
+                    bail!("found XMLEndNS for {want_stack}, but last XMLStartNS was different: {top}");
                 }
                 let unindent = indent.len() - 2;
                 indent.drain(unindent..);
             }
-            XMLStartElement as u16 => {
+            Some(XMLStartElement) => {
                 let ns: u32 = r.get()?;
                 let name: u32 = r.get()?;
                 r.expect(0x14u16, "attributes start")?;
                 r.expect(0x14u16, "attributes size")?;
                 let n_attr: u16 = r.get()?;
-                r.expect(0u16, "ID index");
-                r.expect(0u16, "class index");
-                r.expect(0u16, "style index");
-                let mut row = indent + "E: ";
+                r.expect(0u16, "ID index")?;
+                r.expect(0u16, "class index")?;
+                r.expect(0u16, "style index")?;
+                let mut row = indent.clone() + "E: ";
                 if ns != 0xffff_ffffu32 {
-                    row.push_str(pool[ns as usize] + ":");
+                    row.push_str(&(pool[ns as usize].clone() + ":"));
                 }
-                result.push(row + pool[name as usize]);
+                out.push(row + &pool[name as usize]);
                 indent.push_str("  ");
-                stack.push(format!("E {ns:#02x} {name:#02x}"));
+                stack.push(format!("E {ns:08x} {name:08x}"));
                 // Attributes
-                for i in 0..n_attr {
+                for _ in 0..n_attr {
                     let ns: u32 = r.get()?;
                     let name: u32 = r.get()?;
                     let raw: u32 = r.get()?;
-                    r.expect(8u16, "attr size");
-                    r.expect(0u8, "res0");
+                    r.expect(8u16, "attr size")?;
+                    r.expect(0u8, "res0")?;
                     let data_type: u8 = r.get()?;
                     let data: u32 = r.get()?;
-                    let mut row = indent + "A: ";
+                    let mut row = indent.clone() + "A: ";
                     if ns != 0xffff_ffffu32 {
-                        row.push_str(pool[ns as usize] + ":");
+                        row.push_str(&(pool[ns as usize].clone() + ":"));
                     }
-                    row.push_str(pool[name as usize]);
-                    if name < res_ids.len() {
-                        row.push_str(&format!("(0x{:#02x})", res_ids[name as usize]));
+                    row.push_str(&pool[name as usize]);
+                    if (name as usize) < res_ids.len() {
+                        row.push_str(&format!("(0x{:08x})", res_ids[name as usize]));
                     }
                     row.push_str("=");
-                    match data_type {
-                        DataType::String as u8 => row.push_str(&format!("\"{}\"", pool[data as usize])),
-                        DataType::Int as u8 => row.push_str(&format!("{}", data)),
-                        _ => bail!("unknown attribute type: 0x{data_type:#02x}"),
+                    match DataType::from_u8(data_type) {
+                        Some(DataType::String) => row.push_str(&format!("\"{}\"", pool[data as usize])),
+                        Some(DataType::Int) => row.push_str(&format!("{}", data)),
+                        _ => bail!("unknown attribute type: 0x{data_type:02x}"),
                     }
                     if raw != 0xffff_ffffu32 {
                         row.push_str(&format!(" (Raw: \"{}\")", pool[raw as usize]));
                     }
-                    result.push(row);
+                    out.push(row);
                 }
                 indent.push_str("  ");
             }
-            XMLEndElement as u16 => {
+            Some(XMLEndElement) => {
                 let ns: u32 = r.get()?;
                 let name: u32 = r.get()?;
-                let want_stack = format!("E {ns:#02x} {name:#02x}");
+                let want_stack = format!("E {ns:08x} {name:08x}");
                 let Some(top) = stack.pop() else {
                     bail!("found XMLEndElement without matching start: {want_stack}");
                 };
                 if top != want_stack {
-                    bail!("found XMLEndElement for {}, but last XMLStartElement was different: {top}");
+                    bail!("found XMLEndElement for {want_stack}, but last XMLStartElement was different: {top}");
                 }
                 let unindent = indent.len() - 4;
                 indent.drain(unindent..);
             }
-            _ => bail!("unexpected chunk type: 0x{chunk_type:#02x}"),
+            _ => bail!("unexpected chunk type: 0x{chunk_type:04x}"),
         }
-        if stack.len() != 0 {
-            bail!("unexpected non-empty stack: {stack:?}");
-        }
+    }
+    if stack.len() != 0 {
+        bail!("unexpected non-empty stack: {stack:?}");
     }
 
 
     Ok(out)
 }
 
-fn is_eof(r: &mut impl peekread::PeekRead) -> IoResult<bool> {
+fn is_eof(r: &mut impl peekread::PeekRead) -> io::Result<bool> {
     let mut peeker = r.peek();
     let Err(e) = peeker.get::<u8>() else {
         return Ok(false);
-    }
+    };
     if e.kind() == io::ErrorKind::UnexpectedEof {
         return Ok(true);
     }
@@ -206,8 +210,8 @@ mod tests {
     #[test]
     fn dump_hello_akavel() {
         assert_eq!(
-            dump(Cursor::new(parse_hex(HELLO_AKAVEL_BINARY_MANIFEST))).unwrap().join("\n"),
             HELLO_AKAVEL_WANTED_DUMP,
+            dump(Cursor::new(parse_hex(HELLO_AKAVEL_BINARY_MANIFEST))).unwrap().join("\n"),
         );
     }
 
@@ -306,20 +310,20 @@ ffff ffff 0e00 0000 0301 1000 1800 0000
 "#;
 
     const HELLO_AKAVEL_WANTED_DUMP: &str = r#"Binary XML
-N: android=http://schemas.android.com/apk/res/android (line=2)
-  E: manifest (line=2)
+N: android=http://schemas.android.com/apk/res/android
+  E: manifest
     A: http://schemas.android.com/apk/res/android:compileSdkVersion(0x01010572)=28
     A: http://schemas.android.com/apk/res/android:compileSdkVersionCodename(0x01010573)="9" (Raw: "9")
     A: package="com.akavel.hello" (Raw: "com.akavel.hello")
     A: platformBuildVersionCode=28 (Raw: "28")
     A: platformBuildVersionName=9 (Raw: "9")
-      E: application (line=4)
+      E: application
         A: http://schemas.android.com/apk/res/android:label(0x01010001)="HelloDali" (Raw: "HelloDali")
-          E: activity (line=5)
+          E: activity
             A: http://schemas.android.com/apk/res/android:name(0x01010003)="HelloActivity" (Raw: "HelloActivity")
-              E: intent-filter (line=6)
-                  E: action (line=7)
+              E: intent-filter
+                  E: action
                     A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.action.MAIN" (Raw: "android.intent.action.MAIN")
-                  E: category (line=8)
+                  E: category
                     A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.category.LAUNCHER" (Raw: "android.intent.category.LAUNCHER")"#;
 }
