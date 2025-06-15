@@ -4,7 +4,7 @@ use std::{fmt, io};
 
 #[derive(Error, Debug)]
 pub enum ExpectError<T: fmt::LowerHex> {
-    #[error("{name} mismatch, expected 0x{expected:#02x}, got: 0x{actual:#02x}")]
+    #[error("{name} mismatch, expected 0x{expected:x}, got: 0x{actual:x}")]
     Mismatch {
         name: &'static str,
         expected: T,

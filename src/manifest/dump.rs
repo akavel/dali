@@ -67,6 +67,11 @@ pub fn dump(mut r: impl io::Read) -> anyhow::Result<Vec<String>> {
         pool.push(buf);
     }
 
+    // XXX HACK XXX: dumb very not smart way to eat padding bytes
+    let mut r = peekread::BufPeekReader::new(r);
+    while skip_if_u8(&mut r, 0)? {
+    }
+
     // Read "XML resources map"
     // Chunk header
     r.expect(ChunkType::XMLResourceMap as u16, "XML resources map header")?;
@@ -79,7 +84,6 @@ pub fn dump(mut r: impl io::Read) -> anyhow::Result<Vec<String>> {
     }
 
     // Read "XML nodes"
-    let mut r = peekread::BufPeekReader::new(r);
     let mut prev_line_no = 1u32;
     let mut indent = String::new();
     let mut stack = vec![];
@@ -197,6 +201,18 @@ fn is_eof(r: &mut impl peekread::PeekRead) -> io::Result<bool> {
         return Ok(true);
     }
     Err(e)
+}
+
+fn skip_if_u8(r: &mut impl peekread::PeekRead, skip_if: u8) -> io::Result<bool> {
+    {
+        let mut peeker = r.peek();
+        let v = peeker.get::<u8>()?;
+        if v != skip_if {
+            return Ok(false);
+        }
+    }
+    r.get::<u8>()?; // TODO: assert that result equals `skip_if`
+    Ok(true)
 }
 
 #[cfg(test)]

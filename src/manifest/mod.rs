@@ -14,19 +14,19 @@ pub fn compile(xml: &Xml) -> anyhow::Result<Vec<u8>> {
     if xml.tag_name().name() != "manifest" {
         bail!("root node must be <manifest>, got: {}", xml.tag_name().name());
     }
-    const NS_ANDROID: &str = "http://schemas.android.com/apk/res/android";
-    let ns = xml.namespaces().collect::<Vec<&roxmltree::Namespace>>();
-    if ns.len() != 1 || ns[0].name() != Some("android") || ns[0].uri() != NS_ANDROID {
+    if !has_ns_android(xml) {
         bail!("the <manifest> node must have 'xmlns:android' attribute with namespace {NS_ANDROID:?}");
     }
 
     // Collect all strings
-    let (resources, non_resources) = collect_strings(xml);
+    let (resources, mut non_resources) = collect_strings(xml);
+    non_resources.insert("android".to_owned());
+    non_resources.insert(NS_ANDROID.to_owned());
     let mut strings = Vec::<String>::new();
     let mut strings_map = BTreeMap::<String, u32>::new();
-    for s in resources.into_iter() {
+    for s in &resources {
         strings_map.insert(s.clone(), strings.len().try_into().unwrap());
-        strings.push(s);
+        strings.push(s.clone());
     }
     for s in non_resources.into_iter() {
         strings_map.insert(s.clone(), strings.len().try_into().unwrap());
@@ -67,6 +67,22 @@ pub fn compile(xml: &Xml) -> anyhow::Result<Vec<u8>> {
     blob.pad32(); // Note: when chunk size was not rounded to 4 bytes, I got a validation error
     blob.set(strings_size, (blob.len() - strings_pos).try_into().unwrap());
 
+    // Render "XML resource map"
+    let res_map_pos = blob.len();
+    blob.put_u16(ChunkType::XMLResourceMap as u16);
+    blob.put_u16(8u16); // header size
+    let res_map_size = blob.slot32();
+    let known_resources = known_resources();
+    for s in &resources {
+        blob.put_u32(known_resources[s.as_str()]);
+    }
+    blob.set(res_map_size, (blob.len() - res_map_pos).try_into().unwrap());
+
+    // Render XML tree
+    let mut line_no = 2u32;
+    // render_xml(&mut blob, xml, strings_map, &mut line_no);
+
+    blob.set(file_size, blob.len().try_into().unwrap());
     Ok(blob)
 }
 
@@ -92,6 +108,38 @@ fn collect_strings(xml: &Xml) -> (BTreeSet<String>, BTreeSet<String>) {
         }
     }
     (resources, other)
+}
+
+fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>, line_no: &mut u32) {
+    // Open new XML namespace, if needed
+    let mut new_ns = false;
+    // TODO: generalize to fully properly handle namespaces
+    // (current code only handles xmlns:android)
+    if has_ns_android(xml) {
+        let (pos, size) = put_xml(blob, ChunkType::XMLStartNS, line_no);
+        *line_no -= 1;
+        blob.put_u32(strings_map["android"]);
+        blob.put_u32(strings_map[NS_ANDROID]);
+        blob.set(size, (blob.len() - pos).try_into().unwrap());
+    }
+}
+
+fn put_xml(blob: &mut Vec<u8>, typ: ChunkType, line_no: &mut u32) -> (usize, Slot32) {
+    let pos = blob.len();
+    blob.put_u16(typ as u16);
+    blob.put_u16(0x10u16);
+    let size = blob.slot32();
+    blob.put_u32(*line_no);
+    *line_no += 1;
+    blob.put_u32(0xffff_ffffu32); // comment index
+    (pos, size)
+}
+
+const NS_ANDROID: &str = "http://schemas.android.com/apk/res/android";
+
+fn has_ns_android(xml: &Xml) -> bool {
+    let ns = xml.namespaces().collect::<Vec<&roxmltree::Namespace>>();
+    ns.len() == 1 && ns[0].name() == Some("android") && ns[0].uri() == NS_ANDROID
 }
 
 fn known_resources() -> BTreeMap<&'static str, u32> {
@@ -133,8 +181,7 @@ mod tests {
 </manifest>
 "#;
 
-    const MANIFEST_DUMP: &str = r#"
-Binary XML
+    const MANIFEST_DUMP: &str = r#"Binary XML
 N: android=http://schemas.android.com/apk/res/android
   E: manifest
     A: http://schemas.android.com/apk/res/android:compileSdkVersion(0x01010572)=28
