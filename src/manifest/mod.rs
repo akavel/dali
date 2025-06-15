@@ -80,7 +80,7 @@ pub fn compile(xml: &Xml) -> anyhow::Result<Vec<u8>> {
 
     // Render XML tree
     let mut line_no = 2u32;
-    // render_xml(&mut blob, xml, strings_map, &mut line_no);
+    render_xml(&mut blob, xml, strings_map, &mut line_no);
 
     blob.set(file_size, blob.len().try_into().unwrap());
     Ok(blob)
@@ -116,8 +116,18 @@ fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>,
     // TODO: generalize to fully properly handle namespaces
     // (current code only handles xmlns:android)
     if has_ns_android(xml) {
+        new_ns = true;
         let (pos, size) = put_xml(blob, ChunkType::XMLStartNS, line_no);
         *line_no -= 1;
+        blob.put_u32(strings_map["android"]);
+        blob.put_u32(strings_map[NS_ANDROID]);
+        blob.set(size, (blob.len() - pos).try_into().unwrap());
+    }
+
+    // Close an XML namespace, if needed
+    if new_ns {
+        // *line_no -= 1;
+        let (pos, size) = put_xml(blob, ChunkType::XMLEndNS, line_no);
         blob.put_u32(strings_map["android"]);
         blob.put_u32(strings_map[NS_ANDROID]);
         blob.set(size, (blob.len() - pos).try_into().unwrap());
