@@ -126,8 +126,9 @@ fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>,
 
     // Render XML element start
     let (pos, size) = put_xml(blob, ChunkType::XMLStartElement, line_no);
+    let tag = xml.tag_name().name();
     blob.put_u32(0xffff_ffffu32); // TODO: handle namespaces
-    blob.put_u32(strings_map[xml.tag_name().name()]);
+    blob.put_u32(strings_map[tag]);
     blob.put_u16(0x14u16); // attr start
     blob.put_u16(0x14u16); // attr size
     let n_attrs = xml.attributes().count().try_into().unwrap();
@@ -144,9 +145,22 @@ fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>,
             // TODO: handle other namespaces too
             blob.put_u32(0xffff_ffffu32);
         }
+        let raw = strings_map[a.value()];
+        let data = raw;
         blob.put_u32(strings_map[a.name()]);
-
+        blob.put_u32(raw);
+        blob.put_u16(8u16); // size
+        blob.put_u8(0); // res0
+        blob.put_u8(DataType::String as u8);
+        blob.put_u32(data);
     }
+    blob.set(size, (blob.len() - pos).try_into().unwrap());
+
+    // Render XML element end
+    let (pos_end, size_end) = put_xml(blob, ChunkType::XMLEndElement, line_no);
+    blob.put_u32(0xffff_ffffu32); // TODO: handle namespaces
+    blob.put_u32(strings_map[tag]);
+    blob.set(size_end, (blob.len() - pos_end).try_into().unwrap());
 
     // Close an XML namespace, if needed
     if new_ns {
