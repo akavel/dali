@@ -124,6 +124,30 @@ fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>,
         blob.set(size, (blob.len() - pos).try_into().unwrap());
     }
 
+    // Render XML element start
+    let (pos, size) = put_xml(blob, ChunkType::XMLStartElement, line_no);
+    blob.put_u32(0xffff_ffffu32); // TODO: handle namespaces
+    blob.put_u32(strings_map[xml.tag_name().name()]);
+    blob.put_u16(0x14u16); // attr start
+    blob.put_u16(0x14u16); // attr size
+    let n_attrs = xml.attributes().count().try_into().unwrap();
+    blob.put_u16(n_attrs);
+    blob.put_u16(0); // ID index
+    blob.put_u16(0); // class index
+    blob.put_u16(0); // style index
+
+    // Render attributes
+    for a in xml.attributes() {
+        if a.namespace() == Some(NS_ANDROID) {
+            blob.put_u32(strings_map[NS_ANDROID]);
+        } else {
+            // TODO: handle other namespaces too
+            blob.put_u32(0xffff_ffffu32);
+        }
+        blob.put_u32(strings_map[a.name()]);
+
+    }
+
     // Close an XML namespace, if needed
     if new_ns {
         // *line_no -= 1;
