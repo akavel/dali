@@ -80,7 +80,7 @@ pub fn compile(xml: &Xml) -> anyhow::Result<Vec<u8>> {
 
     // Render XML tree
     let mut line_no = 2u32;
-    render_xml(&mut blob, xml, strings_map, &mut line_no);
+    render_xml(&mut blob, xml, &strings_map, &mut line_no);
 
     blob.set(file_size, blob.len().try_into().unwrap());
     Ok(blob)
@@ -110,12 +110,17 @@ fn collect_strings(xml: &Xml) -> (BTreeSet<String>, BTreeSet<String>) {
     (resources, other)
 }
 
-fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>, line_no: &mut u32) {
+fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: &BTreeMap<String, u32>, line_no: &mut u32) {
+    if xml.is_text() || xml.is_comment() {
+        return;
+    }
+
     // Open new XML namespace, if needed
     let mut new_ns = false;
     // TODO: generalize to fully properly handle namespaces
     // (current code only handles xmlns:android)
-    if has_ns_android(xml) {
+    let tag = xml.tag_name().name();
+    if tag == "manifest" && has_ns_android(xml) {
         new_ns = true;
         let (pos, size) = put_xml(blob, ChunkType::XMLStartNS, line_no);
         *line_no -= 1;
@@ -126,7 +131,6 @@ fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>,
 
     // Render XML element start
     let (pos, size) = put_xml(blob, ChunkType::XMLStartElement, line_no);
-    let tag = xml.tag_name().name();
     blob.put_u32(0xffff_ffffu32); // TODO: handle namespaces
     blob.put_u32(strings_map[tag]);
     blob.put_u16(0x14u16); // attr start
@@ -155,6 +159,11 @@ fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: BTreeMap<String, u32>,
         blob.put_u32(data);
     }
     blob.set(size, (blob.len() - pos).try_into().unwrap());
+
+    // Render child elements
+    for c in xml.children() {
+        render_xml(blob, &c, &strings_map, line_no);
+    }
 
     // Render XML element end
     let (pos_end, size_end) = put_xml(blob, ChunkType::XMLEndElement, line_no);
