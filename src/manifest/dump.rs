@@ -22,7 +22,7 @@ pub(crate) enum ChunkType {
     XMLResourceMap = 0x0180,
 }
 
-#[derive(FromPrimitive)]
+#[derive(FromPrimitive, Copy, Clone)]
 #[repr(u8)]
 pub(crate) enum DataType {
     String = 0x03,

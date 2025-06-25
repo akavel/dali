@@ -1,5 +1,5 @@
 use std::io;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map, BTreeMap, BTreeSet};
 
 use anyhow::bail;
 use roxmltree::Node as Xml;
@@ -107,6 +107,10 @@ fn collect_strings(xml: &Xml) -> (BTreeSet<String>, BTreeSet<String>) {
             insert(a.value().to_owned());
         }
     }
+    for ((attr, _ns), val) in known_manifest_attrs() {
+        insert(attr.to_owned());
+        insert(val.raw_default.to_owned());
+    }
     (resources, other)
 }
 
@@ -129,33 +133,61 @@ fn render_xml(blob: &mut Vec<u8>, xml: &Xml, strings_map: &BTreeMap<String, u32>
         blob.set(size, (blob.len() - pos).try_into().unwrap());
     }
 
+    // Collect attributes
+    // TODO: refactor to avoid allocations
+    let mut attrs: BTreeMap<_, _> = xml.attributes().map(|v| ((v.name(), v.namespace()), v.value())).collect();
+    // Set default attributes if necessary
+    // TODO: make this more universal and handle namespace properly
+    if tag == "manifest" {
+        for (k, v) in known_manifest_attrs() {
+            use btree_map::Entry::Vacant;
+            if let Vacant(entry) = attrs.entry(k) {
+                entry.insert(v.raw_default);
+            }
+        }
+    }
+
     // Render XML element start
     let (pos, size) = put_xml(blob, ChunkType::XMLStartElement, line_no);
     blob.put_u32(0xffff_ffffu32); // TODO: handle namespaces
     blob.put_u32(strings_map[tag]);
     blob.put_u16(0x14u16); // attr start
     blob.put_u16(0x14u16); // attr size
-    let n_attrs = xml.attributes().count().try_into().unwrap();
-    blob.put_u16(n_attrs);
+    blob.put_u16(attrs.len().try_into().unwrap());
     blob.put_u16(0); // ID index
     blob.put_u16(0); // class index
     blob.put_u16(0); // style index
 
     // Render attributes
-    for a in xml.attributes() {
-        if a.namespace() == Some(NS_ANDROID) {
+    for ((attr, ns), value) in attrs {
+        if ns == Some(NS_ANDROID) {
             blob.put_u32(strings_map[NS_ANDROID]);
         } else {
             // TODO: handle other namespaces too
             blob.put_u32(0xffff_ffffu32);
         }
-        let raw = strings_map[a.value()];
-        let data = raw;
-        blob.put_u32(strings_map[a.name()]);
+        blob.put_u32(strings_map[attr]);
+        let mut data = strings_map[value];
+        let mut raw = data;
+        let mut typ = DataType::String;
+        // TODO: make this more universal and handle namespace properly
+        if tag == "manifest" {
+            let knowns = known_manifest_attrs();
+            if let Some(known) = knowns.get(&(attr, ns)) {
+                typ = known.typ;
+                if known.strip_raw {
+                    raw = 0xffff_ffffu32;
+                }
+            }
+        }
         blob.put_u32(raw);
         blob.put_u16(8u16); // size
         blob.put_u8(0); // res0
-        blob.put_u8(DataType::String as u8);
+        blob.put_u8(typ as u8);
+        if matches!(typ, DataType::Int) {
+            // FIXME: don't unwrap()
+            data = value.parse().unwrap();
+        }
         blob.put_u32(data);
     }
     blob.set(size, (blob.len() - pos).try_into().unwrap());
@@ -208,6 +240,39 @@ fn known_resources() -> BTreeMap<&'static str, u32> {
     ])
 }
 
+fn known_manifest_attrs() -> BTreeMap<AttrWithNs<'static>, KnownAttr> {
+    BTreeMap::from([
+        (("compileSdkVersion", Some(NS_ANDROID)), KnownAttr {
+            raw_default: "28",
+            typ: DataType::Int,
+            strip_raw: true,
+        }),
+        (("compileSdkVersionCodename", Some(NS_ANDROID)), KnownAttr {
+            raw_default: "9",
+            typ: DataType::String,
+            strip_raw: false,
+        }),
+        (("platformBuildVersionCode", None), KnownAttr {
+            raw_default: "28",
+            typ: DataType::Int,
+            strip_raw: false,
+        }),
+        (("platformBuildVersionName", None), KnownAttr {
+            raw_default: "9",
+            typ: DataType::Int,
+            strip_raw: false,
+        }),
+    ])
+}
+
+type AttrWithNs<'a> = (&'a str, Option<&'a str>);
+
+struct KnownAttr {
+    raw_default: &'static str,
+    typ: DataType,
+    strip_raw: bool,
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -220,7 +285,7 @@ mod tests {
         let buf = compile(&manifest.root_element()).unwrap();
         assert_eq!(
             MANIFEST_DUMP,
-            dump(&*buf).unwrap().join("\n"),
+            dump(&*buf).unwrap().join("\n") + "\n",
         );
     }
 
